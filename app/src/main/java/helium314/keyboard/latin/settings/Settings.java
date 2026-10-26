@@ -168,9 +168,10 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_LANGUAGE_SWIPE_DISTANCE = "language_swipe_distance";
     public static final String PREF_TOUCHPAD_SENSITIVITY = "touchpad_sensitivity";
     public static final String PREF_TOUCHPAD_EDGE_SCROLL = "touchpad_edge_scroll";
-    public static final String PREF_TOUCH_ELLIPSE_TIP_OFFSET = "touch_ellipse_tip_offset";
     public static final String PREF_SHOW_TOUCH_ELLIPSE_COUNT = "show_touch_ellipse_count";
-    public static final String PREF_PREDICTIVE_KEY_HITBOX = "predictive_key_hitbox";
+    public static final String PREF_TOUCH_AREA_HIT_DETECTION = "touch_area_hit_detection";
+    public static final String PREF_PREDICTIVE_KEY_HITBOX = "predictive_key_hitbox_growth";
+    public static final String PREF_PREDICTIVE_KEY_HITBOX_TOP = "predictive_key_hitbox_top";
     public static final String PREF_SHOW_PREDICTIVE_KEY_HITBOX = "show_predictive_key_hitbox";
 
     public static final String PREF_ENABLE_CLIPBOARD_HISTORY = "enable_clipboard_history";

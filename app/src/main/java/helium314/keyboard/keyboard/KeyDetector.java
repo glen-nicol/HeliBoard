@@ -9,6 +9,8 @@ package helium314.keyboard.keyboard;
 import android.graphics.Path;
 import android.graphics.Rect;
 
+import helium314.keyboard.latin.settings.Settings;
+
 import java.util.Collections;
 import java.util.Map;
 
@@ -16,8 +18,7 @@ import java.util.Map;
  * This class handles key detection.
  */
 public class KeyDetector {
-    // Expansion at the top edge relative to the bottom, giving a trapezoid that widens downwards.
-    private static final float TOP_EXPANSION_RATIO = 0.25f;
+    private static final int OVERLAP_SAMPLES_PER_AXIS = 15;
 
     private final int mKeyHysteresisDistanceSquared;
     private final int mKeyHysteresisDistanceForSlidingModifierSquared;
@@ -103,9 +104,10 @@ public class KeyDetector {
         }
         final Rect hitBox = key.getHitBox();
         final float bottomMarginX = weight * mKeyboard.mMostCommonKeyWidth;
-        final float topMarginX = bottomMarginX * TOP_EXPANSION_RATIO;
+        final float topRatio = Settings.getValues().mPredictiveKeyHitboxTopRatio;
+        final float topMarginX = bottomMarginX * topRatio;
         final float marginBelow = weight * mKeyboard.mMostCommonKeyHeight;
-        final float marginAbove = marginBelow * TOP_EXPANSION_RATIO;
+        final float marginAbove = marginBelow * topRatio;
         final float left = hitBox.left - mCorrectionX;
         final float right = hitBox.right - mCorrectionX;
         final float top = hitBox.top - mCorrectionY;
@@ -121,6 +123,41 @@ public class KeyDetector {
         out.lineTo(left - topMarginX, top);
         out.close();
         return weight;
+    }
+
+    /**
+     * Picks the key whose hit region, including enlargement of predicted keys, overlaps most with the
+     * touch ellipse. The ellipse uses the same convention as {@link android.view.MotionEvent#getOrientation}.
+     */
+    public Key detectHitKeyByOverlap(final int x, final int y, final float halfMajor,
+            final float halfMinor, final float orientation) {
+        if (mKeyboard == null || halfMajor < 1f) {
+            return detectHitKey(x, y);
+        }
+        final float cos = (float) Math.cos(orientation);
+        final float sin = (float) Math.sin(orientation);
+        final java.util.HashMap<Key, Integer> overlaps = new java.util.HashMap<>();
+        for (int i = 0; i < OVERLAP_SAMPLES_PER_AXIS; i++) {
+            final float u = (2f * i + 1f) / OVERLAP_SAMPLES_PER_AXIS - 1f;
+            for (int j = 0; j < OVERLAP_SAMPLES_PER_AXIS; j++) {
+                final float v = (2f * j + 1f) / OVERLAP_SAMPLES_PER_AXIS - 1f;
+                if (u * u + v * v > 1f) continue;
+                final float localX = u * halfMinor;
+                final float localY = v * halfMajor;
+                final Key key = detectHitKey(Math.round(x + localX * cos - localY * sin),
+                        Math.round(y + localX * sin + localY * cos));
+                if (key != null) overlaps.merge(key, 1, Integer::sum);
+            }
+        }
+        Key bestKey = null;
+        int bestOverlap = 0;
+        for (final java.util.Map.Entry<Key, Integer> entry : overlaps.entrySet()) {
+            if (entry.getValue() > bestOverlap) {
+                bestOverlap = entry.getValue();
+                bestKey = entry.getKey();
+            }
+        }
+        return bestKey != null ? bestKey : detectHitKey(x, y);
     }
 
     /**
@@ -180,18 +217,20 @@ public class KeyDetector {
             if (weight <= 0f) {
                 continue;
             }
+            final float topRatio = Settings.getValues().mPredictiveKeyHitboxTopRatio;
             final Rect hitBox = key.getHitBox();
             final float verticalPosition = Math.min(1f, Math.max(0f,
                     (y - hitBox.top) / (float) hitBox.height()));
             final float marginX = weight * keyWidth
-                    * (TOP_EXPANSION_RATIO + (1f - TOP_EXPANSION_RATIO) * verticalPosition);
-            final float marginY = weight * keyHeight * (y < hitBox.top ? TOP_EXPANSION_RATIO : 1f);
+                    * (topRatio + (1f - topRatio) * verticalPosition);
+            final float marginY = weight * keyHeight * (y < hitBox.top ? topRatio : 1f);
             final int outsideX = Math.max(0, Math.max(hitBox.left - x, x - hitBox.right));
             final int outsideY = Math.max(0, Math.max(hitBox.top - y, y - hitBox.bottom));
             if (outsideX > marginX || outsideY > marginY) {
                 continue;
             }
-            final float relativeDistance = Math.max(outsideX / marginX, outsideY / marginY);
+            final float relativeDistance = Math.max(marginX > 0f ? outsideX / marginX : 0f,
+                    marginY > 0f ? outsideY / marginY : 0f);
             final float strength = weight * (1f - relativeDistance);
             if (strength > bestStrength) {
                 bestStrength = strength;

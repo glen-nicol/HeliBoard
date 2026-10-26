@@ -87,9 +87,10 @@ public class SettingsValues {
     public final int mLanguageSwipeDistance;
     public final int mTouchpadSensitivity;
     public final boolean mTouchpadEdgeScroll;
-    public final float mTouchEllipseTipOffset;
     public final int mShowTouchEllipseCount;
+    public final boolean mTouchAreaHitDetection;
     public final float mPredictiveKeyHitbox;
+    public final float mPredictiveKeyHitboxTopRatio;
     public final boolean mShowPredictiveKeyHitbox;
     public final int mDeleteSwipe;
     public final boolean mAutospaceAfterPunctuation;
@@ -283,9 +284,11 @@ public class SettingsValues {
         mTouchpadSensitivity = prefs.getInt(Settings.PREF_TOUCHPAD_SENSITIVITY,
             Defaults.PREF_TOUCHPAD_SENSITIVITY);
         mTouchpadEdgeScroll = prefs.getBoolean(Settings.PREF_TOUCHPAD_EDGE_SCROLL, Defaults.PREF_TOUCHPAD_EDGE_SCROLL);
-        mTouchEllipseTipOffset = prefs.getInt(Settings.PREF_TOUCH_ELLIPSE_TIP_OFFSET, Defaults.PREF_TOUCH_ELLIPSE_TIP_OFFSET) / 100f;
         mShowTouchEllipseCount = prefs.getInt(Settings.PREF_SHOW_TOUCH_ELLIPSE_COUNT, Defaults.PREF_SHOW_TOUCH_ELLIPSE_COUNT);
-        mPredictiveKeyHitbox = prefs.getInt(Settings.PREF_PREDICTIVE_KEY_HITBOX, Defaults.PREF_PREDICTIVE_KEY_HITBOX) / 100f;
+        mTouchAreaHitDetection = prefs.getBoolean(Settings.PREF_TOUCH_AREA_HIT_DETECTION, Defaults.PREF_TOUCH_AREA_HIT_DETECTION);
+        // Stored as growth percentage (100 = no growth), converted to max extension in typical key sizes.
+        mPredictiveKeyHitbox = Math.max(0, prefs.getInt(Settings.PREF_PREDICTIVE_KEY_HITBOX, Defaults.PREF_PREDICTIVE_KEY_HITBOX) - 100) / 100f;
+        mPredictiveKeyHitboxTopRatio = prefs.getInt(Settings.PREF_PREDICTIVE_KEY_HITBOX_TOP, Defaults.PREF_PREDICTIVE_KEY_HITBOX_TOP) / 100f;
         mShowPredictiveKeyHitbox = prefs.getBoolean(Settings.PREF_SHOW_PREDICTIVE_KEY_HITBOX, Defaults.PREF_SHOW_PREDICTIVE_KEY_HITBOX);
         mDeleteSwipe = prefs.getInt(Settings.PREF_DELETE_SWIPE, Defaults.PREF_DELETE_SWIPE);
         mAutospaceAfterPunctuation = prefs.getBoolean(Settings.PREF_AUTOSPACE_AFTER_PUNCTUATION, Defaults.PREF_AUTOSPACE_AFTER_PUNCTUATION);

@@ -942,12 +942,14 @@ New dictionary:
     <string name="touchpad_edge_scroll">Touchpad edge scrolling</string>
     <!-- Description for the touchpad edge scrolling option -->
     <string name="touchpad_edge_scroll_description">Automatically scroll when sliding to the edge of the keyboard</string>
-    <!-- Title of the setting for shifting the touch point towards the tip of the finger contact ellipse -->
-    <string name="touch_ellipse_tip_offset">Shift touch point towards fingertip</string>
-    <!-- Title of the setting for how many recent touch contact ellipses, centers and shifted touch points to draw -->
-    <string name="show_touch_ellipse">Show recent touch areas and touch points</string>
+    <!-- Title of the setting for how many recent touch contact ellipses and centers to draw -->
+    <string name="show_touch_ellipse">Show recent touch areas</string>
+    <!-- Title of the setting for choosing the key that overlaps most with the touch area -->
+    <string name="touch_area_hit_detection">Pick key with most overlap with touch area</string>
     <!-- Title of the setting for enlarging hitboxes of keys likely to be typed next -->
-    <string name="predictive_key_hitbox">Enlarge hitbox of predicted next keys</string>
+    <string name="predictive_key_hitbox">Hitbox size of predicted next keys</string>
+    <!-- Title of the setting for how much the top of the enlarged hitbox grows, relative to the bottom -->
+    <string name="predictive_key_hitbox_top">Enlargement at top of predicted keys (relative to bottom)</string>
     <!-- Title of the setting for drawing the enlarged hitboxes of predicted next keys -->
     <string name="show_predictive_key_hitbox">Show enlarged hitboxes of predicted next keys</string>
     <!-- Title of the setting for variable toolbar direction -->

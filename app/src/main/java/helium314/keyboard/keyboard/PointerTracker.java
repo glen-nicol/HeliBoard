@@ -122,8 +122,16 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
     private final BogusMoveEventDetector mBogusMoveEventDetector = new BogusMoveEventDetector();
 
     // Fixed at down so that a growing contact ellipse doesn't drag the pointer onto another key.
-    private int mTouchOffsetX;
-    private int mTouchOffsetY;
+    private float mTouchHalfMajor;
+    private float mTouchHalfMinor;
+    private float mTouchOrientation;
+
+    private Key detectKey(final int x, final int y) {
+        if (Settings.getValues().mTouchAreaHitDetection) {
+            return mKeyDetector.detectHitKeyByOverlap(x, y, mTouchHalfMajor, mTouchHalfMinor, mTouchOrientation);
+        }
+        return mKeyDetector.detectHitKey(x, y);
+    }
 
     private boolean mIsDetectingGesture = false; // per PointerTracker.
     private static boolean sInGesture = false;
@@ -408,14 +416,6 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         mBogusMoveEventDetector.setKeyboardGeometry(keyWidth, keyHeight);
     }
 
-    public int getTouchOffsetX() {
-        return mTouchOffsetX;
-    }
-
-    public int getTouchOffsetY() {
-        return mTouchOffsetY;
-    }
-
     @Override
     public boolean isInDraggingFinger() {
         return mIsInDraggingFinger;
@@ -432,7 +432,7 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
     }
 
     public Key getKeyOn(final int x, final int y) {
-        return mKeyDetector.detectHitKey(x, y);
+        return detectKey(x, y);
     }
 
     private void setReleasedKeyGraphics(@Nullable final Key key, final boolean withAnimation) {
@@ -537,7 +537,7 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         mBogusMoveEventDetector.onMoveKey(getDistance(x, y, mLastX, mLastY));
         mLastX = x;
         mLastY = y;
-        return mKeyDetector.detectHitKey(x, y);
+        return detectKey(x, y);
     }
 
     private Key onMoveKey(final int x, final int y) {
@@ -641,18 +641,18 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
                     continue;
                 }
                 final PointerTracker tracker = getPointerTracker(id);
-                final int x = (int)me.getX(index) + tracker.mTouchOffsetX;
-                final int y = (int)me.getY(index) + tracker.mTouchOffsetY;
+                final int x = (int)me.getX(index);
+                final int y = (int)me.getY(index);
                 tracker.onMoveEvent(x, y, eventTime, me);
             }
             return;
         }
         final int index = me.getActionIndex();
         if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
-            updateTouchOffset(me, index);
+            updateTouchShape(me, index);
         }
-        final int x = (int)me.getX(index) + mTouchOffsetX;
-        final int y = (int)me.getY(index) + mTouchOffsetY;
+        final int x = (int)me.getX(index);
+        final int y = (int)me.getY(index);
         switch (action) {
             case MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> onDownEvent(x, y, eventTime, keyDetector);
             case MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> onUpEvent(x, y, eventTime);
@@ -660,18 +660,11 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         }
     }
 
-    private void updateTouchOffset(final MotionEvent me, final int index) {
-        final float factor = Settings.getValues().mTouchEllipseTipOffset;
-        if (factor <= 0f) {
-            mTouchOffsetX = 0;
-            mTouchOffsetY = 0;
-            return;
-        }
-        // Orientation is clockwise from vertical in [-pi/2, pi/2], so cos >= 0 and the offset points up.
-        final float halfMajor = me.getTouchMajor(index) * 0.5f * factor;
-        final float orientation = me.getOrientation(index);
-        mTouchOffsetX = Math.round((float) Math.sin(orientation) * halfMajor);
-        mTouchOffsetY = -Math.round((float) Math.cos(orientation) * halfMajor);
+    private void updateTouchShape(final MotionEvent me, final int index) {
+        mTouchHalfMajor = me.getTouchMajor(index) * 0.5f;
+        final float minor = me.getTouchMinor(index);
+        mTouchHalfMinor = minor > 0f ? minor * 0.5f : mTouchHalfMajor;
+        mTouchOrientation = me.getOrientation(index);
     }
 
     private void onDownEvent(final int x, final int y, final long eventTime,
@@ -847,8 +840,8 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
             final int pointerIndex = me.findPointerIndex(mPointerId);
             final int historicalSize = me.getHistorySize();
             for (int h = 0; h < historicalSize; h++) {
-                final int historicalX = (int)me.getHistoricalX(pointerIndex, h) + mTouchOffsetX;
-                final int historicalY = (int)me.getHistoricalY(pointerIndex, h) + mTouchOffsetY;
+                final int historicalX = (int)me.getHistoricalX(pointerIndex, h);
+                final int historicalY = (int)me.getHistoricalY(pointerIndex, h);
                 final long historicalTime = me.getHistoricalEventTime(h);
                 onGestureMoveEvent(historicalX, historicalY, historicalTime, false, null);
             }

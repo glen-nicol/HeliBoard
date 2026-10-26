@@ -305,30 +305,26 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
     private final Path mKeyWeightRegionPath = new Path();
     private final Paint mKeyWeightRegionPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint mTouchOverlayPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    // No orange (offset point) or pink (predicted key regions) to keep the overlays distinguishable.
+    // No pink (predicted key regions) to keep the overlays distinguishable.
     private static final int[] TOUCH_OVERLAY_COLORS = {
             Color.rgb(0, 120, 255), Color.rgb(0, 200, 80), Color.rgb(150, 80, 255),
             Color.rgb(0, 210, 230), Color.rgb(150, 220, 0), Color.rgb(70, 70, 200),
             Color.rgb(0, 150, 140), Color.rgb(200, 100, 255), Color.rgb(100, 180, 255),
             Color.rgb(40, 140, 40)
     };
-    private static final int TOUCH_OFFSET_COLOR = Color.rgb(255, 140, 0);
     private final java.util.ArrayDeque<TouchRecord> mTouchRecords = new java.util.ArrayDeque<>();
     private int mTouchRecordColorIndex;
 
     private static final class TouchRecord {
         final float x, y, major, minor, orientation;
-        final int offsetX, offsetY, color;
+        final int color;
 
-        TouchRecord(final MotionEvent event, final int index, final int offsetX, final int offsetY,
-                final int color) {
+        TouchRecord(final MotionEvent event, final int index, final int color) {
             x = event.getX(index);
             y = event.getY(index);
             major = event.getTouchMajor(index);
             minor = event.getTouchMinor(index);
             orientation = event.getOrientation(index);
-            this.offsetX = offsetX;
-            this.offsetY = offsetY;
             this.color = color;
         }
     }
@@ -365,14 +361,9 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
         canvas.drawOval(-halfMinor, -halfMajor, halfMinor, halfMajor, mTouchOverlayPaint);
         canvas.restore();
 
-        final float offsetX = touch.x + touch.offsetX;
-        final float offsetY = touch.y + touch.offsetY;
-        canvas.drawLine(touch.x, touch.y, offsetX, offsetY, mTouchOverlayPaint);
         mTouchOverlayPaint.setStyle(Paint.Style.FILL);
         mTouchOverlayPaint.setColor(touch.color);
         canvas.drawCircle(touch.x, touch.y, 6f, mTouchOverlayPaint);
-        mTouchOverlayPaint.setColor(TOUCH_OFFSET_COLOR);
-        canvas.drawCircle(offsetX, offsetY, 6f, mTouchOverlayPaint);
     }
 
     private static int withAlpha(final int color, final int alpha) {
@@ -719,8 +710,7 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
         if (touchCount > 0
                 && (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN)) {
             final int color = TOUCH_OVERLAY_COLORS[mTouchRecordColorIndex++ % TOUCH_OVERLAY_COLORS.length];
-            mTouchRecords.addLast(new TouchRecord(event, index,
-                    tracker.getTouchOffsetX(), tracker.getTouchOffsetY(), color));
+            mTouchRecords.addLast(new TouchRecord(event, index, color));
             while (mTouchRecords.size() > touchCount) {
                 mTouchRecords.removeFirst();
             }

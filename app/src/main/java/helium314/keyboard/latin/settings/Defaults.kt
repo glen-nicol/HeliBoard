@@ -160,9 +160,10 @@ object Defaults {
     const val PREF_LANGUAGE_SWIPE_DISTANCE = 5
     const val PREF_TOUCHPAD_SENSITIVITY = 50
     const val PREF_TOUCHPAD_EDGE_SCROLL = true
-    const val PREF_TOUCH_ELLIPSE_TIP_OFFSET = 0
     const val PREF_SHOW_TOUCH_ELLIPSE_COUNT = 0
-    const val PREF_PREDICTIVE_KEY_HITBOX = 0
+    const val PREF_TOUCH_AREA_HIT_DETECTION = false
+    const val PREF_PREDICTIVE_KEY_HITBOX = 100
+    const val PREF_PREDICTIVE_KEY_HITBOX_TOP = 25
     const val PREF_SHOW_PREDICTIVE_KEY_HITBOX = false
     const val PREF_ENABLE_CLIPBOARD_HISTORY = true
     const val PREF_CLIPBOARD_HISTORY_RETENTION_TIME = 10 // minutes

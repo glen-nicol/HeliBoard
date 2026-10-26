@@ -88,10 +88,12 @@ fun AdvancedSettingsScreen(
         R.string.settings_category_experimental,
         Settings.PREF_EMOJI_MAX_SDK,
         Settings.PREF_URL_DETECTION,
-        Settings.PREF_TOUCH_ELLIPSE_TIP_OFFSET,
         Settings.PREF_SHOW_TOUCH_ELLIPSE_COUNT,
+        Settings.PREF_TOUCH_AREA_HIT_DETECTION,
         Settings.PREF_PREDICTIVE_KEY_HITBOX,
-        if (prefs.getInt(Settings.PREF_PREDICTIVE_KEY_HITBOX, Defaults.PREF_PREDICTIVE_KEY_HITBOX) > 0)
+        if (prefs.getInt(Settings.PREF_PREDICTIVE_KEY_HITBOX, Defaults.PREF_PREDICTIVE_KEY_HITBOX) > 100)
+            Settings.PREF_PREDICTIVE_KEY_HITBOX_TOP else null,
+        if (prefs.getInt(Settings.PREF_PREDICTIVE_KEY_HITBOX, Defaults.PREF_PREDICTIVE_KEY_HITBOX) > 100)
             Settings.PREF_SHOW_PREDICTIVE_KEY_HITBOX else null,
         Settings.PREF_ENABLE_HARDWARE_KEYBOARD,
         if (BuildConfig.BUILD_TYPE != "nouserlib") SettingsWithoutKey.LOAD_GESTURE_LIB else null
@@ -284,15 +286,6 @@ fun createAdvancedSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_URL_DETECTION, R.string.url_detection_title, R.string.url_detection_summary) {
         SwitchPreference(it, Defaults.PREF_URL_DETECTION)
     },
-    Setting(context, Settings.PREF_TOUCH_ELLIPSE_TIP_OFFSET, R.string.touch_ellipse_tip_offset) { setting ->
-        SliderPreference(
-            name = setting.title,
-            key = setting.key,
-            default = Defaults.PREF_TOUCH_ELLIPSE_TIP_OFFSET,
-            range = 0f..100f,
-            description = { "$it%" }
-        )
-    },
     Setting(context, Settings.PREF_SHOW_TOUCH_ELLIPSE_COUNT, R.string.show_touch_ellipse) { setting ->
         SliderPreference(
             name = setting.title,
@@ -302,11 +295,23 @@ fun createAdvancedSettings(context: Context) = listOf(
             description = { it.toString() }
         )
     },
+    Setting(context, Settings.PREF_TOUCH_AREA_HIT_DETECTION, R.string.touch_area_hit_detection) {
+        SwitchPreference(it, Defaults.PREF_TOUCH_AREA_HIT_DETECTION)
+    },
     Setting(context, Settings.PREF_PREDICTIVE_KEY_HITBOX, R.string.predictive_key_hitbox) { setting ->
         SliderPreference(
             name = setting.title,
             key = setting.key,
             default = Defaults.PREF_PREDICTIVE_KEY_HITBOX,
+            range = 100f..133f,
+            description = { "$it%" }
+        )
+    },
+    Setting(context, Settings.PREF_PREDICTIVE_KEY_HITBOX_TOP, R.string.predictive_key_hitbox_top) { setting ->
+        SliderPreference(
+            name = setting.title,
+            key = setting.key,
+            default = Defaults.PREF_PREDICTIVE_KEY_HITBOX_TOP,
             range = 0f..100f,
             description = { "$it%" }
         )
