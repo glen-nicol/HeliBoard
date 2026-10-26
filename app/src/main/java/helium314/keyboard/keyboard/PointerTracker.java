@@ -121,6 +121,10 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
     private Keyboard mKeyboard;
     private final BogusMoveEventDetector mBogusMoveEventDetector = new BogusMoveEventDetector();
 
+    // Fixed at down so that a growing contact ellipse doesn't drag the pointer onto another key.
+    private int mTouchOffsetX;
+    private int mTouchOffsetY;
+
     private boolean mIsDetectingGesture = false; // per PointerTracker.
     private static boolean sInGesture = false;
     private static TypingTimeRecorder sTypingTimeRecorder;
@@ -404,6 +408,14 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         mBogusMoveEventDetector.setKeyboardGeometry(keyWidth, keyHeight);
     }
 
+    public int getTouchOffsetX() {
+        return mTouchOffsetX;
+    }
+
+    public int getTouchOffsetY() {
+        return mTouchOffsetY;
+    }
+
     @Override
     public boolean isInDraggingFinger() {
         return mIsInDraggingFinger;
@@ -628,21 +640,38 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
                 if (shouldIgnoreOtherPointers && id != mPointerId) {
                     continue;
                 }
-                final int x = (int)me.getX(index);
-                final int y = (int)me.getY(index);
                 final PointerTracker tracker = getPointerTracker(id);
+                final int x = (int)me.getX(index) + tracker.mTouchOffsetX;
+                final int y = (int)me.getY(index) + tracker.mTouchOffsetY;
                 tracker.onMoveEvent(x, y, eventTime, me);
             }
             return;
         }
         final int index = me.getActionIndex();
-        final int x = (int)me.getX(index);
-        final int y = (int)me.getY(index);
+        if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN) {
+            updateTouchOffset(me, index);
+        }
+        final int x = (int)me.getX(index) + mTouchOffsetX;
+        final int y = (int)me.getY(index) + mTouchOffsetY;
         switch (action) {
             case MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> onDownEvent(x, y, eventTime, keyDetector);
             case MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> onUpEvent(x, y, eventTime);
             case MotionEvent.ACTION_CANCEL -> onCancelEvent(x, y, eventTime);
         }
+    }
+
+    private void updateTouchOffset(final MotionEvent me, final int index) {
+        final float factor = Settings.getValues().mTouchEllipseTipOffset;
+        if (factor <= 0f) {
+            mTouchOffsetX = 0;
+            mTouchOffsetY = 0;
+            return;
+        }
+        // Orientation is clockwise from vertical in [-pi/2, pi/2], so cos >= 0 and the offset points up.
+        final float halfMajor = me.getTouchMajor(index) * 0.5f * factor;
+        final float orientation = me.getOrientation(index);
+        mTouchOffsetX = Math.round((float) Math.sin(orientation) * halfMajor);
+        mTouchOffsetY = -Math.round((float) Math.cos(orientation) * halfMajor);
     }
 
     private void onDownEvent(final int x, final int y, final long eventTime,
@@ -818,8 +847,8 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
             final int pointerIndex = me.findPointerIndex(mPointerId);
             final int historicalSize = me.getHistorySize();
             for (int h = 0; h < historicalSize; h++) {
-                final int historicalX = (int)me.getHistoricalX(pointerIndex, h);
-                final int historicalY = (int)me.getHistoricalY(pointerIndex, h);
+                final int historicalX = (int)me.getHistoricalX(pointerIndex, h) + mTouchOffsetX;
+                final int historicalY = (int)me.getHistoricalY(pointerIndex, h) + mTouchOffsetY;
                 final long historicalTime = me.getHistoricalEventTime(h);
                 onGestureMoveEvent(historicalX, historicalY, historicalTime, false, null);
             }
@@ -1317,6 +1346,8 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
             return;
         }
 
+        // Weights belong to the previous input state; new ones arrive with the next suggestions.
+        mKeyDetector.clearKeyWeights();
         final int code = key.getCode();
         callListenerOnCodeInput(key, code, x, y, eventTime, false);
         callListenerOnRelease(key, code, false);

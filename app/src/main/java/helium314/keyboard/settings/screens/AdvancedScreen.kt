@@ -88,6 +88,11 @@ fun AdvancedSettingsScreen(
         R.string.settings_category_experimental,
         Settings.PREF_EMOJI_MAX_SDK,
         Settings.PREF_URL_DETECTION,
+        Settings.PREF_TOUCH_ELLIPSE_TIP_OFFSET,
+        Settings.PREF_SHOW_TOUCH_ELLIPSE_COUNT,
+        Settings.PREF_PREDICTIVE_KEY_HITBOX,
+        if (prefs.getInt(Settings.PREF_PREDICTIVE_KEY_HITBOX, Defaults.PREF_PREDICTIVE_KEY_HITBOX) > 0)
+            Settings.PREF_SHOW_PREDICTIVE_KEY_HITBOX else null,
         Settings.PREF_ENABLE_HARDWARE_KEYBOARD,
         if (BuildConfig.BUILD_TYPE != "nouserlib") SettingsWithoutKey.LOAD_GESTURE_LIB else null
     )
@@ -278,6 +283,36 @@ fun createAdvancedSettings(context: Context) = listOf(
     },
     Setting(context, Settings.PREF_URL_DETECTION, R.string.url_detection_title, R.string.url_detection_summary) {
         SwitchPreference(it, Defaults.PREF_URL_DETECTION)
+    },
+    Setting(context, Settings.PREF_TOUCH_ELLIPSE_TIP_OFFSET, R.string.touch_ellipse_tip_offset) { setting ->
+        SliderPreference(
+            name = setting.title,
+            key = setting.key,
+            default = Defaults.PREF_TOUCH_ELLIPSE_TIP_OFFSET,
+            range = 0f..100f,
+            description = { "$it%" }
+        )
+    },
+    Setting(context, Settings.PREF_SHOW_TOUCH_ELLIPSE_COUNT, R.string.show_touch_ellipse) { setting ->
+        SliderPreference(
+            name = setting.title,
+            key = setting.key,
+            default = Defaults.PREF_SHOW_TOUCH_ELLIPSE_COUNT,
+            range = 0f..10f,
+            description = { it.toString() }
+        )
+    },
+    Setting(context, Settings.PREF_PREDICTIVE_KEY_HITBOX, R.string.predictive_key_hitbox) { setting ->
+        SliderPreference(
+            name = setting.title,
+            key = setting.key,
+            default = Defaults.PREF_PREDICTIVE_KEY_HITBOX,
+            range = 0f..100f,
+            description = { "$it%" }
+        )
+    },
+    Setting(context, Settings.PREF_SHOW_PREDICTIVE_KEY_HITBOX, R.string.show_predictive_key_hitbox) {
+        SwitchPreference(it, Defaults.PREF_SHOW_PREDICTIVE_KEY_HITBOX)
     },
     Setting(context, Settings.PREF_ENABLE_HARDWARE_KEYBOARD, R.string.prefs_enable_hardware_keyboard) {
         SwitchPreference(it, Defaults.PREF_ENABLE_HARDWARE_KEYBOARD)

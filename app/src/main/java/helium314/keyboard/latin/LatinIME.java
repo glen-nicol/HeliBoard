@@ -85,6 +85,7 @@ import helium314.keyboard.settings.SettingsActivity2;
 import kotlin.Unit;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
@@ -1406,6 +1407,7 @@ public class LatinIME extends InputMethodService implements
     private void setSuggestedWords(final SuggestedWords suggestedWords) {
         final SettingsValues currentSettingsValues = mSettings.getCurrent();
         mInputLogic.setSuggestedWords(suggestedWords);
+        updateNextKeyWeights(suggestedWords, currentSettingsValues.mPredictiveKeyHitbox);
         // TODO: Modify this when we support suggestions with hard keyboard
         if (!hasSuggestionStripView()) {
             return;
@@ -1432,6 +1434,48 @@ public class LatinIME extends InputMethodService implements
                 mSuggestionStripView.setToolbarVisibility(false);
             }
         }
+    }
+
+    private static final int MAX_SUGGESTIONS_FOR_KEY_WEIGHTS = 8;
+
+    /** Weights keys by how likely they are to be typed next, judging by the rank of matching suggestions. */
+    private void updateNextKeyWeights(final SuggestedWords suggestedWords, final float scale) {
+        final MainKeyboardView mainKeyboardView = mKeyboardSwitcher.getMainKeyboardView();
+        if (mainKeyboardView == null) {
+            return;
+        }
+        final HashMap<Integer, Float> weights = new HashMap<>();
+        final boolean isPrediction = suggestedWords.isPrediction();
+        final SuggestedWordInfo typedWordInfo = suggestedWords.getTypedWordInfo();
+        if (scale > 0f && !suggestedWords.isPunctuationSuggestions()
+                && (isPrediction || (suggestedWords.mInputStyle == SuggestedWords.INPUT_STYLE_TYPING && typedWordInfo != null))) {
+            final String typedWord = isPrediction ? "" : typedWordInfo.mWord;
+            float totalWeight = 0f;
+            final int count = Math.min(suggestedWords.size(), MAX_SUGGESTIONS_FOR_KEY_WEIGHTS);
+            for (int i = 0; i < count; i++) {
+                final SuggestedWordInfo info = suggestedWords.getInfo(i);
+                final String word = info.mWord;
+                final float rankWeight = 1f / (i + 1);
+                final int nextCodePoint;
+                if (info.isKindOf(SuggestedWordInfo.KIND_TYPED)) {
+                    if (isPrediction || !suggestedWords.mTypedWordValid) continue;
+                    nextCodePoint = Constants.CODE_SPACE;
+                } else if (!word.regionMatches(true, 0, typedWord, 0, typedWord.length())) {
+                    continue; // a correction rather than a completion
+                } else if (word.length() == typedWord.length()) {
+                    nextCodePoint = Constants.CODE_SPACE;
+                } else {
+                    nextCodePoint = Character.toLowerCase(word.codePointAt(typedWord.length()));
+                }
+                final Float previous = weights.get(nextCodePoint);
+                weights.put(nextCodePoint, (previous == null ? 0f : previous) + rankWeight);
+                totalWeight += rankWeight;
+            }
+            for (final java.util.Map.Entry<Integer, Float> entry : weights.entrySet()) {
+                entry.setValue(entry.getValue() / totalWeight * scale);
+            }
+        }
+        mainKeyboardView.setKeyWeights(weights);
     }
 
     @Override

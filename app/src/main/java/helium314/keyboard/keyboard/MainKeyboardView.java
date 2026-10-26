@@ -17,6 +17,7 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Paint.Align;
+import android.graphics.Path;
 import android.graphics.Typeface;
 import android.util.AttributeSet;
 import android.view.ContextThemeWrapper;
@@ -292,6 +293,112 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
     // TODO: We should reconsider which coordinate system should be used to represent keyboard event.
     public int getKeyY(final int y) {
         return Constants.isValidCoordinate(y) ? mKeyDetector.getTouchY(y) : y;
+    }
+
+    public void setKeyWeights(@NonNull final java.util.Map<Integer, Float> weights) {
+        mKeyDetector.setKeyWeights(weights);
+        if (Settings.getValues().mShowPredictiveKeyHitbox) {
+            invalidate();
+        }
+    }
+
+    private final Path mKeyWeightRegionPath = new Path();
+    private final Paint mKeyWeightRegionPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint mTouchOverlayPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    // No orange (offset point) or pink (predicted key regions) to keep the overlays distinguishable.
+    private static final int[] TOUCH_OVERLAY_COLORS = {
+            Color.rgb(0, 120, 255), Color.rgb(0, 200, 80), Color.rgb(150, 80, 255),
+            Color.rgb(0, 210, 230), Color.rgb(150, 220, 0), Color.rgb(70, 70, 200),
+            Color.rgb(0, 150, 140), Color.rgb(200, 100, 255), Color.rgb(100, 180, 255),
+            Color.rgb(40, 140, 40)
+    };
+    private static final int TOUCH_OFFSET_COLOR = Color.rgb(255, 140, 0);
+    private final java.util.ArrayDeque<TouchRecord> mTouchRecords = new java.util.ArrayDeque<>();
+    private int mTouchRecordColorIndex;
+
+    private static final class TouchRecord {
+        final float x, y, major, minor, orientation;
+        final int offsetX, offsetY, color;
+
+        TouchRecord(final MotionEvent event, final int index, final int offsetX, final int offsetY,
+                final int color) {
+            x = event.getX(index);
+            y = event.getY(index);
+            major = event.getTouchMajor(index);
+            minor = event.getTouchMinor(index);
+            orientation = event.getOrientation(index);
+            this.offsetX = offsetX;
+            this.offsetY = offsetY;
+            this.color = color;
+        }
+    }
+
+    @Override
+    protected void onDraw(@NonNull final Canvas canvas) {
+        super.onDraw(canvas);
+        drawKeyWeightRegions(canvas);
+        drawTouchRecords(canvas);
+    }
+
+    private void drawTouchRecords(@NonNull final Canvas canvas) {
+        final int touchCount = Settings.getValues().mShowTouchEllipseCount;
+        int toSkip = mTouchRecords.size() - touchCount;
+        for (final TouchRecord touch : mTouchRecords) {
+            if (toSkip-- > 0) continue;
+            drawTouchRecord(canvas, touch);
+        }
+    }
+
+    private void drawTouchRecord(@NonNull final Canvas canvas, @NonNull final TouchRecord touch) {
+        final float halfMajor = touch.major / 2;
+        final float halfMinor = (touch.minor > 0 ? touch.minor : touch.major) / 2;
+        canvas.save();
+        canvas.translate(touch.x, touch.y);
+        // Orientation is clockwise from vertical, matching canvas rotation direction.
+        canvas.rotate((float) Math.toDegrees(touch.orientation));
+        mTouchOverlayPaint.setStyle(Paint.Style.FILL);
+        mTouchOverlayPaint.setColor(withAlpha(touch.color, 50));
+        canvas.drawOval(-halfMinor, -halfMajor, halfMinor, halfMajor, mTouchOverlayPaint);
+        mTouchOverlayPaint.setStyle(Paint.Style.STROKE);
+        mTouchOverlayPaint.setStrokeWidth(2f);
+        mTouchOverlayPaint.setColor(withAlpha(touch.color, 200));
+        canvas.drawOval(-halfMinor, -halfMajor, halfMinor, halfMajor, mTouchOverlayPaint);
+        canvas.restore();
+
+        final float offsetX = touch.x + touch.offsetX;
+        final float offsetY = touch.y + touch.offsetY;
+        canvas.drawLine(touch.x, touch.y, offsetX, offsetY, mTouchOverlayPaint);
+        mTouchOverlayPaint.setStyle(Paint.Style.FILL);
+        mTouchOverlayPaint.setColor(touch.color);
+        canvas.drawCircle(touch.x, touch.y, 6f, mTouchOverlayPaint);
+        mTouchOverlayPaint.setColor(TOUCH_OFFSET_COLOR);
+        canvas.drawCircle(offsetX, offsetY, 6f, mTouchOverlayPaint);
+    }
+
+    private static int withAlpha(final int color, final int alpha) {
+        return (color & 0x00FFFFFF) | (alpha << 24);
+    }
+
+    private void drawKeyWeightRegions(@NonNull final Canvas canvas) {
+        final Keyboard keyboard = getKeyboard();
+        if (keyboard == null || !Settings.getValues().mShowPredictiveKeyHitbox) {
+            return;
+        }
+        final float maxWeight = Math.max(Settings.getValues().mPredictiveKeyHitbox, 0.01f);
+        for (final Key key : keyboard.getSortedKeys()) {
+            final float weight = mKeyDetector.getWeightedKeyRegion(key, mKeyWeightRegionPath);
+            if (weight <= 0f) {
+                continue;
+            }
+            final int alpha = (int) (30 + 90 * Math.min(1f, weight / maxWeight));
+            mKeyWeightRegionPaint.setStyle(Paint.Style.FILL);
+            mKeyWeightRegionPaint.setColor(Color.argb(alpha, 255, 0, 128));
+            canvas.drawPath(mKeyWeightRegionPath, mKeyWeightRegionPaint);
+            mKeyWeightRegionPaint.setStyle(Paint.Style.STROKE);
+            mKeyWeightRegionPaint.setStrokeWidth(2f);
+            mKeyWeightRegionPaint.setColor(Color.argb(Math.min(255, alpha * 2), 255, 0, 128));
+            canvas.drawPath(mKeyWeightRegionPath, mKeyWeightRegionPaint);
+        }
     }
 
     /**
@@ -607,6 +714,18 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
             return true;
         }
         tracker.processMotionEvent(event, mKeyDetector);
+        final int action = event.getActionMasked();
+        final int touchCount = Settings.getValues().mShowTouchEllipseCount;
+        if (touchCount > 0
+                && (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_POINTER_DOWN)) {
+            final int color = TOUCH_OVERLAY_COLORS[mTouchRecordColorIndex++ % TOUCH_OVERLAY_COLORS.length];
+            mTouchRecords.addLast(new TouchRecord(event, index,
+                    tracker.getTouchOffsetX(), tracker.getTouchOffsetY(), color));
+            while (mTouchRecords.size() > touchCount) {
+                mTouchRecords.removeFirst();
+            }
+            invalidate();
+        }
         return true;
     }
 
