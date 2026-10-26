@@ -91,6 +91,8 @@ public class SettingsValues {
     public final boolean mTouchAreaHitDetection;
     public final float mPredictiveKeyHitbox;
     public final float mPredictiveKeyHitboxTopRatio;
+    public final float mPredictiveKeyHitboxUpRatio;
+    public final float mPredictiveKeyMinProbability;
     public final boolean mShowPredictiveKeyHitbox;
     public final int mDeleteSwipe;
     public final boolean mAutospaceAfterPunctuation;
@@ -289,6 +291,8 @@ public class SettingsValues {
         // Stored as growth percentage (100 = no growth), converted to max extension in typical key sizes.
         mPredictiveKeyHitbox = Math.max(0, prefs.getInt(Settings.PREF_PREDICTIVE_KEY_HITBOX, Defaults.PREF_PREDICTIVE_KEY_HITBOX) - 100) / 100f;
         mPredictiveKeyHitboxTopRatio = prefs.getInt(Settings.PREF_PREDICTIVE_KEY_HITBOX_TOP, Defaults.PREF_PREDICTIVE_KEY_HITBOX_TOP) / 100f;
+        mPredictiveKeyHitboxUpRatio = prefs.getInt(Settings.PREF_PREDICTIVE_KEY_HITBOX_UP, Defaults.PREF_PREDICTIVE_KEY_HITBOX_UP) / 100f;
+        mPredictiveKeyMinProbability = prefs.getInt(Settings.PREF_PREDICTIVE_KEY_MIN_PROBABILITY, Defaults.PREF_PREDICTIVE_KEY_MIN_PROBABILITY) / 100f;
         mShowPredictiveKeyHitbox = prefs.getBoolean(Settings.PREF_SHOW_PREDICTIVE_KEY_HITBOX, Defaults.PREF_SHOW_PREDICTIVE_KEY_HITBOX);
         mDeleteSwipe = prefs.getInt(Settings.PREF_DELETE_SWIPE, Defaults.PREF_DELETE_SWIPE);
         mAutospaceAfterPunctuation = prefs.getBoolean(Settings.PREF_AUTOSPACE_AFTER_PUNCTUATION, Defaults.PREF_AUTOSPACE_AFTER_PUNCTUATION);

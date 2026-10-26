@@ -172,6 +172,8 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_TOUCH_AREA_HIT_DETECTION = "touch_area_hit_detection";
     public static final String PREF_PREDICTIVE_KEY_HITBOX = "predictive_key_hitbox_growth";
     public static final String PREF_PREDICTIVE_KEY_HITBOX_TOP = "predictive_key_hitbox_top";
+    public static final String PREF_PREDICTIVE_KEY_HITBOX_UP = "predictive_key_hitbox_up";
+    public static final String PREF_PREDICTIVE_KEY_MIN_PROBABILITY = "predictive_key_min_probability";
     public static final String PREF_SHOW_PREDICTIVE_KEY_HITBOX = "show_predictive_key_hitbox";
 
     public static final String PREF_ENABLE_CLIPBOARD_HISTORY = "enable_clipboard_history";

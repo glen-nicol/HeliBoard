@@ -164,6 +164,8 @@ object Defaults {
     const val PREF_TOUCH_AREA_HIT_DETECTION = false
     const val PREF_PREDICTIVE_KEY_HITBOX = 100
     const val PREF_PREDICTIVE_KEY_HITBOX_TOP = 25
+    const val PREF_PREDICTIVE_KEY_HITBOX_UP = 25
+    const val PREF_PREDICTIVE_KEY_MIN_PROBABILITY = 5
     const val PREF_SHOW_PREDICTIVE_KEY_HITBOX = false
     const val PREF_ENABLE_CLIPBOARD_HISTORY = true
     const val PREF_CLIPBOARD_HISTORY_RETENTION_TIME = 10 // minutes

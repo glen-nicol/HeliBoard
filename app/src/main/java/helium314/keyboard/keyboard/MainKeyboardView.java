@@ -20,6 +20,7 @@ import android.graphics.Paint.Align;
 import android.graphics.Path;
 import android.graphics.Typeface;
 import android.util.AttributeSet;
+import android.util.TypedValue;
 import android.view.ContextThemeWrapper;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -295,8 +296,8 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
         return Constants.isValidCoordinate(y) ? mKeyDetector.getTouchY(y) : y;
     }
 
-    public void setKeyWeights(@NonNull final java.util.Map<Integer, Float> weights) {
-        mKeyDetector.setKeyWeights(weights);
+    public void setKeyProbabilities(@NonNull final java.util.Map<Integer, Float> probabilities) {
+        mKeyDetector.setKeyProbabilities(probabilities);
         if (Settings.getValues().mShowPredictiveKeyHitbox) {
             invalidate();
         }
@@ -304,6 +305,11 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
 
     private final Path mKeyWeightRegionPath = new Path();
     private final Paint mKeyWeightRegionPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint mKeyWeightLabelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    {
+        mKeyWeightLabelPaint.setColor(Color.rgb(255, 0, 128));
+        mKeyWeightLabelPaint.setTextAlign(Align.RIGHT);
+    }
     private final Paint mTouchOverlayPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     // No pink (predicted key regions) to keep the overlays distinguishable.
     private static final int[] TOUCH_OVERLAY_COLORS = {
@@ -389,6 +395,12 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
             mKeyWeightRegionPaint.setStrokeWidth(2f);
             mKeyWeightRegionPaint.setColor(Color.argb(Math.min(255, alpha * 2), 255, 0, 128));
             canvas.drawPath(mKeyWeightRegionPath, mKeyWeightRegionPaint);
+
+            final int percent = Math.round(mKeyDetector.getKeyProbability(key) * 100);
+            mKeyWeightLabelPaint.setTextSize(TypedValue.applyDimension(
+                    TypedValue.COMPLEX_UNIT_SP, 8f, getResources().getDisplayMetrics()));
+            canvas.drawText(percent + "%", key.getX() + key.getWidth() + getPaddingLeft() - 3f,
+                    key.getY() + key.getHeight() + getPaddingTop() - 3f, mKeyWeightLabelPaint);
         }
     }
 

@@ -26,6 +26,8 @@ public class KeyDetector {
     private Keyboard mKeyboard;
     private int mCorrectionX;
     private int mCorrectionY;
+    // lowercase code point -> probability of being typed next
+    private Map<Integer, Float> mKeyProbabilities = Collections.emptyMap();
     // lowercase code point -> expansion as fraction of the most common key size
     private Map<Integer, Float> mKeyWeights = Collections.emptyMap();
 
@@ -56,6 +58,7 @@ public class KeyDetector {
         mCorrectionX = (int)correctionX;
         mCorrectionY = (int)correctionY;
         mKeyboard = keyboard;
+        updateKeyWeights();
     }
 
     public int getKeyHysteresisDistanceSquared(final boolean isSlidingFromModifier) {
@@ -80,12 +83,58 @@ public class KeyDetector {
         return false;
     }
 
-    public void setKeyWeights(final Map<Integer, Float> weights) {
-        mKeyWeights = weights;
+    public void setKeyProbabilities(final Map<Integer, Float> probabilities) {
+        mKeyProbabilities = probabilities;
+        updateKeyWeights();
     }
 
     public void clearKeyWeights() {
+        mKeyProbabilities = Collections.emptyMap();
         mKeyWeights = Collections.emptyMap();
+    }
+
+    /**
+     * Isolated predicted keys get the full growth; predicted keys whose enlarged regions could touch
+     * share it according to probability, relative to the most probable key among them.
+     */
+    private void updateKeyWeights() {
+        final float scale = Settings.getValues().mPredictiveKeyHitbox;
+        if (mKeyboard == null || mKeyProbabilities.isEmpty() || scale <= 0f) {
+            mKeyWeights = Collections.emptyMap();
+            return;
+        }
+        final float minProbability = Settings.getValues().mPredictiveKeyMinProbability;
+        final java.util.ArrayList<Key> predictedKeys = new java.util.ArrayList<>();
+        for (final Key key : mKeyboard.getSortedKeys()) {
+            final float probability = getKeyProbability(key);
+            if (probability > 0f && probability >= minProbability) predictedKeys.add(key);
+        }
+        final float maxGapX = 2 * scale * mKeyboard.mMostCommonKeyWidth;
+        final float maxGapY = 2 * scale * mKeyboard.mMostCommonKeyHeight;
+        final java.util.HashMap<Integer, Float> weights = new java.util.HashMap<>();
+        for (final Key key : predictedKeys) {
+            final float probability = getKeyProbability(key);
+            float maxNearbyProbability = probability;
+            final Rect hitBox = key.getHitBox();
+            for (final Key other : predictedKeys) {
+                final Rect otherHitBox = other.getHitBox();
+                final int gapX = Math.max(otherHitBox.left - hitBox.right, hitBox.left - otherHitBox.right);
+                final int gapY = Math.max(otherHitBox.top - hitBox.bottom, hitBox.top - otherHitBox.bottom);
+                if (gapX <= maxGapX && gapY <= maxGapY) {
+                    maxNearbyProbability = Math.max(maxNearbyProbability, getKeyProbability(other));
+                }
+            }
+            final int code = Character.toLowerCase(key.getCode());
+            final float weight = scale * probability / maxNearbyProbability;
+            final Float previous = weights.get(code);
+            weights.put(code, previous == null ? weight : Math.max(previous, weight));
+        }
+        mKeyWeights = weights;
+    }
+
+    public float getKeyProbability(final Key key) {
+        final Float probability = mKeyProbabilities.get(Character.toLowerCase(key.getCode()));
+        return probability == null ? 0f : probability;
     }
 
     private float getKeyWeight(final Key key) {
@@ -107,7 +156,7 @@ public class KeyDetector {
         final float topRatio = Settings.getValues().mPredictiveKeyHitboxTopRatio;
         final float topMarginX = bottomMarginX * topRatio;
         final float marginBelow = weight * mKeyboard.mMostCommonKeyHeight;
-        final float marginAbove = marginBelow * topRatio;
+        final float marginAbove = marginBelow * Settings.getValues().mPredictiveKeyHitboxUpRatio;
         final float left = hitBox.left - mCorrectionX;
         final float right = hitBox.right - mCorrectionX;
         final float top = hitBox.top - mCorrectionY;
@@ -223,7 +272,8 @@ public class KeyDetector {
                     (y - hitBox.top) / (float) hitBox.height()));
             final float marginX = weight * keyWidth
                     * (topRatio + (1f - topRatio) * verticalPosition);
-            final float marginY = weight * keyHeight * (y < hitBox.top ? topRatio : 1f);
+            final float marginY = weight * keyHeight
+                    * (y < hitBox.top ? Settings.getValues().mPredictiveKeyHitboxUpRatio : 1f);
             final int outsideX = Math.max(0, Math.max(hitBox.left - x, x - hitBox.right));
             final int outsideY = Math.max(0, Math.max(hitBox.top - y, y - hitBox.bottom));
             if (outsideX > marginX || outsideY > marginY) {

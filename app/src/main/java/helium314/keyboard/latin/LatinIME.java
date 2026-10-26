@@ -1472,10 +1472,10 @@ public class LatinIME extends InputMethodService implements
                 totalWeight += rankWeight;
             }
             for (final java.util.Map.Entry<Integer, Float> entry : weights.entrySet()) {
-                entry.setValue(entry.getValue() / totalWeight * scale);
+                entry.setValue(entry.getValue() / totalWeight);
             }
         }
-        mainKeyboardView.setKeyWeights(weights);
+        mainKeyboardView.setKeyProbabilities(weights);
     }
 
     @Override

@@ -94,6 +94,10 @@ fun AdvancedSettingsScreen(
         if (prefs.getInt(Settings.PREF_PREDICTIVE_KEY_HITBOX, Defaults.PREF_PREDICTIVE_KEY_HITBOX) > 100)
             Settings.PREF_PREDICTIVE_KEY_HITBOX_TOP else null,
         if (prefs.getInt(Settings.PREF_PREDICTIVE_KEY_HITBOX, Defaults.PREF_PREDICTIVE_KEY_HITBOX) > 100)
+            Settings.PREF_PREDICTIVE_KEY_HITBOX_UP else null,
+        if (prefs.getInt(Settings.PREF_PREDICTIVE_KEY_HITBOX, Defaults.PREF_PREDICTIVE_KEY_HITBOX) > 100)
+            Settings.PREF_PREDICTIVE_KEY_MIN_PROBABILITY else null,
+        if (prefs.getInt(Settings.PREF_PREDICTIVE_KEY_HITBOX, Defaults.PREF_PREDICTIVE_KEY_HITBOX) > 100)
             Settings.PREF_SHOW_PREDICTIVE_KEY_HITBOX else null,
         Settings.PREF_ENABLE_HARDWARE_KEYBOARD,
         if (BuildConfig.BUILD_TYPE != "nouserlib") SettingsWithoutKey.LOAD_GESTURE_LIB else null
@@ -313,6 +317,24 @@ fun createAdvancedSettings(context: Context) = listOf(
             key = setting.key,
             default = Defaults.PREF_PREDICTIVE_KEY_HITBOX_TOP,
             range = 0f..100f,
+            description = { "$it%" }
+        )
+    },
+    Setting(context, Settings.PREF_PREDICTIVE_KEY_HITBOX_UP, R.string.predictive_key_hitbox_up) { setting ->
+        SliderPreference(
+            name = setting.title,
+            key = setting.key,
+            default = Defaults.PREF_PREDICTIVE_KEY_HITBOX_UP,
+            range = 0f..100f,
+            description = { "$it%" }
+        )
+    },
+    Setting(context, Settings.PREF_PREDICTIVE_KEY_MIN_PROBABILITY, R.string.predictive_key_min_probability) { setting ->
+        SliderPreference(
+            name = setting.title,
+            key = setting.key,
+            default = Defaults.PREF_PREDICTIVE_KEY_MIN_PROBABILITY,
+            range = 0f..50f,
             description = { "$it%" }
         )
     },
