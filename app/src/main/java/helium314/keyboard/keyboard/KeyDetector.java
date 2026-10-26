@@ -8,6 +8,8 @@ package helium314.keyboard.keyboard;
 
 import android.graphics.Path;
 import android.graphics.Rect;
+import android.graphics.RectF;
+import android.graphics.Region;
 
 import helium314.keyboard.latin.settings.Settings;
 
@@ -19,6 +21,9 @@ import java.util.Map;
  */
 public class KeyDetector {
     private static final int OVERLAP_SAMPLES_PER_AXIS = 15;
+    private static final float CORNER_RADIUS_RATIO = 0.3f;
+    // Top corners are pulled less than bottom corners, as fingers come from below.
+    private static final float TOP_PULL_RATIO = 0.95f;
 
     private final int mKeyHysteresisDistanceSquared;
     private final int mKeyHysteresisDistanceForSlidingModifierSquared;
@@ -30,6 +35,10 @@ public class KeyDetector {
     private Map<Integer, Float> mKeyProbabilities = Collections.emptyMap();
     // lowercase code point -> expansion as fraction of the most common key size
     private Map<Integer, Float> mKeyWeights = Collections.emptyMap();
+    private Map<Key, Region> mKeyRegions = Collections.emptyMap();
+    private Map<Key, Path> mKeyPaths = Collections.emptyMap();
+    private float mMaxStretchX = 1f;
+    private float mMaxStretchY = 1f;
 
     public KeyDetector() {
         this(0.0f /* keyHysteresisDistance */, 0.0f /* keyHysteresisDistanceForSlidingModifier */);
@@ -91,6 +100,8 @@ public class KeyDetector {
     public void clearKeyWeights() {
         mKeyProbabilities = Collections.emptyMap();
         mKeyWeights = Collections.emptyMap();
+        mKeyRegions = Collections.emptyMap();
+        mKeyPaths = Collections.emptyMap();
     }
 
     /**
@@ -101,16 +112,27 @@ public class KeyDetector {
         final float scale = Settings.getValues().mPredictiveKeyHitbox;
         if (mKeyboard == null || mKeyProbabilities.isEmpty() || scale <= 0f) {
             mKeyWeights = Collections.emptyMap();
+            mKeyRegions = Collections.emptyMap();
+            mKeyPaths = Collections.emptyMap();
             return;
         }
+        final float drag = Settings.getValues().mPredictiveKeyDrag;
+        final int keyWidth = mKeyboard.mMostCommonKeyWidth;
+        final int keyHeight = mKeyboard.mMostCommonKeyHeight;
+        // Dragging can stretch the region beyond the plain enlargement, up to this limit.
+        final float maxStretch = scale * (1f + drag);
+        mMaxStretchX = maxStretch * keyWidth;
+        mMaxStretchY = maxStretch * keyHeight;
+
         final float minProbability = Settings.getValues().mPredictiveKeyMinProbability;
         final java.util.ArrayList<Key> predictedKeys = new java.util.ArrayList<>();
         for (final Key key : mKeyboard.getSortedKeys()) {
             final float probability = getKeyProbability(key);
             if (probability > 0f && probability >= minProbability) predictedKeys.add(key);
         }
-        final float maxGapX = 2 * scale * mKeyboard.mMostCommonKeyWidth;
-        final float maxGapY = 2 * scale * mKeyboard.mMostCommonKeyHeight;
+        final float maxGapX = 2 * mMaxStretchX;
+        final float maxGapY = 2 * mMaxStretchY;
+        final java.util.HashMap<Key, Float> keyWeights = new java.util.HashMap<>();
         final java.util.HashMap<Integer, Float> weights = new java.util.HashMap<>();
         for (final Key key : predictedKeys) {
             final float probability = getKeyProbability(key);
@@ -124,12 +146,122 @@ public class KeyDetector {
                     maxNearbyProbability = Math.max(maxNearbyProbability, getKeyProbability(other));
                 }
             }
-            final int code = Character.toLowerCase(key.getCode());
             final float weight = scale * probability / maxNearbyProbability;
+            keyWeights.put(key, weight);
+            final int code = Character.toLowerCase(key.getCode());
             final Float previous = weights.get(code);
             weights.put(code, previous == null ? weight : Math.max(previous, weight));
         }
+
+        final java.util.HashMap<Key, Region> regions = new java.util.HashMap<>();
+        final java.util.HashMap<Key, Path> paths = new java.util.HashMap<>();
+        final RectF bounds = new RectF();
+        for (final Map.Entry<Key, Float> entry : keyWeights.entrySet()) {
+            final Path path = buildKeyRegionPath(entry.getKey().getHitBox(), entry.getValue(), drag);
+            path.computeBounds(bounds, true);
+            final Region region = new Region();
+            region.setPath(path, new Region((int) Math.floor(bounds.left) - 1, (int) Math.floor(bounds.top) - 1,
+                    (int) Math.ceil(bounds.right) + 1, (int) Math.ceil(bounds.bottom) + 1));
+            regions.put(entry.getKey(), region);
+            paths.put(entry.getKey(), path);
+        }
         mKeyWeights = weights;
+        mKeyRegions = regions;
+        mKeyPaths = paths;
+    }
+
+    /**
+     * Enlarges the hitbox by the weight, then drags left corners towards the bottom left and right
+     * corners towards the bottom right of the keyboard, pulling harder the further away they are
+     * (top corners less). The region is a rubber band stretched around the dragged corners and the
+     * original hitbox corners, so the original key area is always kept.
+     */
+    private Path buildKeyRegionPath(final Rect hitBox, final float weight, final float drag) {
+        final float keyWidth = mKeyboard.mMostCommonKeyWidth;
+        final float keyHeight = mKeyboard.mMostCommonKeyHeight;
+        final float keyboardWidth = Math.max(1, mKeyboard.mOccupiedWidth);
+        final float keyboardHeight = Math.max(1, mKeyboard.mOccupiedHeight);
+        final float pullX = 2f * drag * weight * keyWidth / keyboardWidth;
+        final float pullY = 2f * drag * weight * keyHeight / keyboardHeight;
+        final float topPullX = pullX * TOP_PULL_RATIO;
+        final float topPullY = pullY * TOP_PULL_RATIO;
+
+        final float left = hitBox.left - weight * keyWidth;
+        final float right = hitBox.right + weight * keyWidth;
+        final float top = hitBox.top - weight * keyHeight;
+        final float bottom = hitBox.bottom + weight * keyHeight;
+        final float minLeft = hitBox.left - mMaxStretchX;
+        final float maxRight = hitBox.right + mMaxStretchX;
+        final float maxBottom = hitBox.bottom + mMaxStretchY;
+
+        // dragged top left, top right, bottom right, bottom left, then the original hitbox corners
+        final float[] xs = {
+                Math.max(minLeft, left - topPullX * left),
+                Math.min(maxRight, right + topPullX * (keyboardWidth - right)),
+                Math.min(maxRight, right + pullX * (keyboardWidth - right)),
+                Math.max(minLeft, left - pullX * left),
+                hitBox.left, hitBox.right, hitBox.right, hitBox.left
+        };
+        final float[] ys = {
+                Math.min(maxBottom, top + topPullY * (keyboardHeight - top)),
+                Math.min(maxBottom, top + topPullY * (keyboardHeight - top)),
+                Math.min(maxBottom, bottom + pullY * (keyboardHeight - bottom)),
+                Math.min(maxBottom, bottom + pullY * (keyboardHeight - bottom)),
+                hitBox.top, hitBox.top, hitBox.bottom, hitBox.bottom
+        };
+        final int[] hull = convexHull(xs, ys);
+        final float[] hullXs = new float[hull.length];
+        final float[] hullYs = new float[hull.length];
+        for (int i = 0; i < hull.length; i++) {
+            hullXs[i] = xs[hull[i]];
+            hullYs[i] = ys[hull[i]];
+        }
+        return roundedPolygon(hullXs, hullYs, CORNER_RADIUS_RATIO * Math.min(keyWidth, keyHeight));
+    }
+
+    /** Andrew's monotone chain; returns indices of hull vertices in order, without collinear points. */
+    private static int[] convexHull(final float[] xs, final float[] ys) {
+        final int n = xs.length;
+        final Integer[] order = new Integer[n];
+        for (int i = 0; i < n; i++) order[i] = i;
+        java.util.Arrays.sort(order, (a, b) -> xs[a] != xs[b] ? Float.compare(xs[a], xs[b]) : Float.compare(ys[a], ys[b]));
+        final int[] hull = new int[2 * n];
+        int size = 0;
+        for (int pass = 0; pass < 2; pass++) {
+            final int start = size;
+            for (int k = 0; k < n; k++) {
+                final int p = order[pass == 0 ? k : n - 1 - k];
+                while (size >= start + 2 && cross(xs, ys, hull[size - 2], hull[size - 1], p) <= 0f) size--;
+                hull[size++] = p;
+            }
+            size--; // last point is the first point of the other chain
+        }
+        return java.util.Arrays.copyOf(hull, Math.max(size, 0));
+    }
+
+    private static float cross(final float[] xs, final float[] ys, final int o, final int a, final int b) {
+        return (xs[a] - xs[o]) * (ys[b] - ys[o]) - (ys[a] - ys[o]) * (xs[b] - xs[o]);
+    }
+
+    private static Path roundedPolygon(final float[] xs, final float[] ys, final float radius) {
+        final Path path = new Path();
+        final int n = xs.length;
+        for (int i = 0; i < n; i++) {
+            final int prev = (i + n - 1) % n;
+            final int next = (i + 1) % n;
+            final float prevLength = (float) Math.hypot(xs[prev] - xs[i], ys[prev] - ys[i]);
+            final float nextLength = (float) Math.hypot(xs[next] - xs[i], ys[next] - ys[i]);
+            final float startFraction = prevLength > 0f ? Math.min(radius, prevLength / 2) / prevLength : 0f;
+            final float endFraction = nextLength > 0f ? Math.min(radius, nextLength / 2) / nextLength : 0f;
+            final float startX = xs[i] + (xs[prev] - xs[i]) * startFraction;
+            final float startY = ys[i] + (ys[prev] - ys[i]) * startFraction;
+            if (i == 0) path.moveTo(startX, startY);
+            else path.lineTo(startX, startY);
+            path.quadTo(xs[i], ys[i], xs[i] + (xs[next] - xs[i]) * endFraction,
+                    ys[i] + (ys[next] - ys[i]) * endFraction);
+        }
+        path.close();
+        return path;
     }
 
     public float getKeyProbability(final Key key) {
@@ -147,31 +279,13 @@ public class KeyDetector {
      * @return the key weight, or 0 if the key has no weight (and {@code out} is untouched).
      */
     public float getWeightedKeyRegion(final Key key, final Path out) {
-        final float weight = mKeyboard == null ? 0f : getKeyWeight(key);
-        if (weight <= 0f) {
+        final Path path = mKeyPaths.get(key);
+        if (path == null) {
             return 0f;
         }
-        final Rect hitBox = key.getHitBox();
-        final float bottomMarginX = weight * mKeyboard.mMostCommonKeyWidth;
-        final float topRatio = Settings.getValues().mPredictiveKeyHitboxTopRatio;
-        final float topMarginX = bottomMarginX * topRatio;
-        final float marginBelow = weight * mKeyboard.mMostCommonKeyHeight;
-        final float marginAbove = marginBelow * Settings.getValues().mPredictiveKeyHitboxUpRatio;
-        final float left = hitBox.left - mCorrectionX;
-        final float right = hitBox.right - mCorrectionX;
-        final float top = hitBox.top - mCorrectionY;
-        final float bottom = hitBox.bottom - mCorrectionY;
-        out.reset();
-        out.moveTo(left - topMarginX, top - marginAbove);
-        out.lineTo(right + topMarginX, top - marginAbove);
-        out.lineTo(right + topMarginX, top);
-        out.lineTo(right + bottomMarginX, bottom);
-        out.lineTo(right + bottomMarginX, bottom + marginBelow);
-        out.lineTo(left - bottomMarginX, bottom + marginBelow);
-        out.lineTo(left - bottomMarginX, bottom);
-        out.lineTo(left - topMarginX, top);
-        out.close();
-        return weight;
+        out.set(path);
+        out.offset(-mCorrectionX, -mCorrectionY);
+        return getKeyWeight(key);
     }
 
     /**
@@ -249,39 +363,25 @@ public class KeyDetector {
     }
 
     /**
-     * Lets keys with a weight claim touches within a trapezoid around their hitbox that widens
-     * towards the bottom, since thumbs approach from below. A claiming key wins over the key
-     * actually hit if its weight, reduced by how far out the touch is, exceeds the hit key's weight.
+     * Lets predicted keys claim touches within their enlarged, dragged region. A claiming key wins
+     * over the key actually hit if its weight, reduced by how far out the touch is, exceeds the hit
+     * key's weight.
      */
     private Key detectWeightedKey(final int x, final int y, final Key primaryKey) {
-        final int keyWidth = mKeyboard.mMostCommonKeyWidth;
-        final int keyHeight = mKeyboard.mMostCommonKeyHeight;
         Key bestKey = primaryKey;
         float bestStrength = primaryKey == null ? 0f : getKeyWeight(primaryKey);
-        for (final Key key : mKeyboard.getNearestKeys(x, y)) {
-            if (key == primaryKey) {
+        for (final Map.Entry<Key, Region> entry : mKeyRegions.entrySet()) {
+            final Key key = entry.getKey();
+            if (key == primaryKey || !entry.getValue().contains(x, y)) {
                 continue;
             }
-            final float weight = getKeyWeight(key);
-            if (weight <= 0f) {
-                continue;
-            }
-            final float topRatio = Settings.getValues().mPredictiveKeyHitboxTopRatio;
             final Rect hitBox = key.getHitBox();
-            final float verticalPosition = Math.min(1f, Math.max(0f,
-                    (y - hitBox.top) / (float) hitBox.height()));
-            final float marginX = weight * keyWidth
-                    * (topRatio + (1f - topRatio) * verticalPosition);
-            final float marginY = weight * keyHeight
-                    * (y < hitBox.top ? Settings.getValues().mPredictiveKeyHitboxUpRatio : 1f);
             final int outsideX = Math.max(0, Math.max(hitBox.left - x, x - hitBox.right));
             final int outsideY = Math.max(0, Math.max(hitBox.top - y, y - hitBox.bottom));
-            if (outsideX > marginX || outsideY > marginY) {
-                continue;
-            }
-            final float relativeDistance = Math.max(marginX > 0f ? outsideX / marginX : 0f,
-                    marginY > 0f ? outsideY / marginY : 0f);
-            final float strength = weight * (1f - relativeDistance);
+            // capped below 1 so that every point inside the region can beat an unpredicted key
+            final float relativeDistance = Math.min(0.95f,
+                    Math.max(outsideX / mMaxStretchX, outsideY / mMaxStretchY));
+            final float strength = getKeyWeight(key) * (1f - relativeDistance);
             if (strength > bestStrength) {
                 bestStrength = strength;
                 bestKey = key;

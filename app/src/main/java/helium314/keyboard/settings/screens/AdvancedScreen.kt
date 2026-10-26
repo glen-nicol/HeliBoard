@@ -92,9 +92,7 @@ fun AdvancedSettingsScreen(
         Settings.PREF_TOUCH_AREA_HIT_DETECTION,
         Settings.PREF_PREDICTIVE_KEY_HITBOX,
         if (prefs.getInt(Settings.PREF_PREDICTIVE_KEY_HITBOX, Defaults.PREF_PREDICTIVE_KEY_HITBOX) > 100)
-            Settings.PREF_PREDICTIVE_KEY_HITBOX_TOP else null,
-        if (prefs.getInt(Settings.PREF_PREDICTIVE_KEY_HITBOX, Defaults.PREF_PREDICTIVE_KEY_HITBOX) > 100)
-            Settings.PREF_PREDICTIVE_KEY_HITBOX_UP else null,
+            Settings.PREF_PREDICTIVE_KEY_DRAG else null,
         if (prefs.getInt(Settings.PREF_PREDICTIVE_KEY_HITBOX, Defaults.PREF_PREDICTIVE_KEY_HITBOX) > 100)
             Settings.PREF_PREDICTIVE_KEY_MIN_PROBABILITY else null,
         if (prefs.getInt(Settings.PREF_PREDICTIVE_KEY_HITBOX, Defaults.PREF_PREDICTIVE_KEY_HITBOX) > 100)
@@ -311,20 +309,11 @@ fun createAdvancedSettings(context: Context) = listOf(
             description = { "$it%" }
         )
     },
-    Setting(context, Settings.PREF_PREDICTIVE_KEY_HITBOX_TOP, R.string.predictive_key_hitbox_top) { setting ->
+    Setting(context, Settings.PREF_PREDICTIVE_KEY_DRAG, R.string.predictive_key_drag) { setting ->
         SliderPreference(
             name = setting.title,
             key = setting.key,
-            default = Defaults.PREF_PREDICTIVE_KEY_HITBOX_TOP,
-            range = 0f..100f,
-            description = { "$it%" }
-        )
-    },
-    Setting(context, Settings.PREF_PREDICTIVE_KEY_HITBOX_UP, R.string.predictive_key_hitbox_up) { setting ->
-        SliderPreference(
-            name = setting.title,
-            key = setting.key,
-            default = Defaults.PREF_PREDICTIVE_KEY_HITBOX_UP,
+            default = Defaults.PREF_PREDICTIVE_KEY_DRAG,
             range = 0f..100f,
             description = { "$it%" }
         )
