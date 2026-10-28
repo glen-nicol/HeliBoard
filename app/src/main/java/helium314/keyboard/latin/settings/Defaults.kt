@@ -163,7 +163,6 @@ object Defaults {
     const val PREF_SHOW_TOUCH_ELLIPSE_COUNT = 0
     const val PREF_TOUCH_AREA_HIT_DETECTION = false
     const val PREF_PREDICTIVE_KEY_HITBOX = 100
-    const val PREF_PREDICTIVE_KEY_DRAG = 50
     const val PREF_PREDICTIVE_KEY_MIN_PROBABILITY = 5
     const val PREF_SHOW_PREDICTIVE_KEY_HITBOX = false
     const val PREF_ENABLE_CLIPBOARD_HISTORY = true

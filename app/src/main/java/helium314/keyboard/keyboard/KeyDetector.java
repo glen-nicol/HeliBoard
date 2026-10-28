@@ -11,6 +11,7 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Region;
 
+import helium314.keyboard.latin.common.Constants;
 import helium314.keyboard.latin.settings.Settings;
 
 import java.util.Collections;
@@ -22,8 +23,12 @@ import java.util.Map;
 public class KeyDetector {
     private static final int OVERLAP_SAMPLES_PER_AXIS = 15;
     private static final float CORNER_RADIUS_RATIO = 0.3f;
-    // Top corners are pulled less than bottom corners, as fingers come from below.
-    private static final float TOP_PULL_RATIO = 0.95f;
+    // Lobe tip half width and notch depth between the lobes, relative to the lobe length.
+    private static final float LOBE_TIP_RATIO = 0.35f;
+    private static final float NOTCH_DEPTH_RATIO = 0.2f;
+    // Where on the key's sides the lobes start, as fraction of key height from the top.
+    private static final float LOBE_SHOULDER_RATIO = 0.33f;
+    private static final int DOME_SEGMENTS = 8;
 
     private final int mKeyHysteresisDistanceSquared;
     private final int mKeyHysteresisDistanceForSlidingModifierSquared;
@@ -116,13 +121,11 @@ public class KeyDetector {
             mKeyPaths = Collections.emptyMap();
             return;
         }
-        final float drag = Settings.getValues().mPredictiveKeyDrag;
         final int keyWidth = mKeyboard.mMostCommonKeyWidth;
         final int keyHeight = mKeyboard.mMostCommonKeyHeight;
-        // Dragging can stretch the region beyond the plain enlargement, up to this limit.
-        final float maxStretch = scale * (1f + drag);
-        mMaxStretchX = maxStretch * keyWidth;
-        mMaxStretchY = maxStretch * keyHeight;
+        // A lobe reaches at most twice the weight beyond the original key.
+        mMaxStretchX = 3f * scale * keyWidth;
+        mMaxStretchY = 2 * scale * keyHeight;
 
         final float minProbability = Settings.getValues().mPredictiveKeyMinProbability;
         final java.util.ArrayList<Key> predictedKeys = new java.util.ArrayList<>();
@@ -157,7 +160,9 @@ public class KeyDetector {
         final java.util.HashMap<Key, Path> paths = new java.util.HashMap<>();
         final RectF bounds = new RectF();
         for (final Map.Entry<Key, Float> entry : keyWeights.entrySet()) {
-            final Path path = buildKeyRegionPath(entry.getKey().getHitBox(), entry.getValue(), drag);
+            final Key key = entry.getKey();
+            final Path path = buildKeyRegionPath(key.getHitBox(), entry.getValue(),
+                    key.getCode() == Constants.CODE_SPACE);
             path.computeBounds(bounds, true);
             final Region region = new Region();
             region.setPath(path, new Region((int) Math.floor(bounds.left) - 1, (int) Math.floor(bounds.top) - 1,
@@ -171,76 +176,65 @@ public class KeyDetector {
     }
 
     /**
-     * Enlarges the hitbox by the weight, then drags left corners towards the bottom left and right
-     * corners towards the bottom right of the keyboard, pulling harder the further away they are
-     * (top corners less). The region is a rubber band stretched around the dragged corners and the
-     * original hitbox corners, so the original key area is always kept.
+     * The key with two lobes growing out of its lower sides, one towards each bottom corner of the
+     * keyboard, and a notch between them below the key. The original key area is always kept.
+     * If {@code domed}, there are no lobes and the top edge bulges upwards, highest in the center.
      */
-    private Path buildKeyRegionPath(final Rect hitBox, final float weight, final float drag) {
+    private Path buildKeyRegionPath(final Rect hitBox, final float weight, final boolean domed) {
         final float keyWidth = mKeyboard.mMostCommonKeyWidth;
         final float keyHeight = mKeyboard.mMostCommonKeyHeight;
-        final float keyboardWidth = Math.max(1, mKeyboard.mOccupiedWidth);
-        final float keyboardHeight = Math.max(1, mKeyboard.mOccupiedHeight);
-        final float pullX = 2f * drag * weight * keyWidth / keyboardWidth;
-        final float pullY = 2f * drag * weight * keyHeight / keyboardHeight;
-        final float topPullX = pullX * TOP_PULL_RATIO;
-        final float topPullY = pullY * TOP_PULL_RATIO;
+        final float keyboardWidth = mKeyboard.mOccupiedWidth;
+        final float keyboardHeight = mKeyboard.mOccupiedHeight;
+        final float lobeLength = 2 * weight * keyWidth;
+        final float tipHalfWidth = LOBE_TIP_RATIO * lobeLength;
+        final float shoulderY = hitBox.top + LOBE_SHOULDER_RATIO * hitBox.height();
 
-        final float left = hitBox.left - weight * keyWidth;
-        final float right = hitBox.right + weight * keyWidth;
-        final float top = hitBox.top - weight * keyHeight;
-        final float bottom = hitBox.bottom + weight * keyHeight;
-        final float minLeft = hitBox.left - mMaxStretchX;
-        final float maxRight = hitBox.right + mMaxStretchX;
-        final float maxBottom = hitBox.bottom + mMaxStretchY;
+        // right lobe towards bottom right corner; outward normal points up and right
+        float dx = keyboardWidth - hitBox.right;
+        float dy = keyboardHeight - hitBox.bottom;
+        float length = Math.max(1f, (float) Math.hypot(dx, dy));
+        dx /= length;
+        dy /= length;
+        final float rightTipX = hitBox.right + dx * lobeLength;
+        final float rightTipY = hitBox.bottom + dy * lobeLength;
+        final float rightOuterX = rightTipX + dy * tipHalfWidth;
+        final float rightOuterY = rightTipY - dx * tipHalfWidth;
+        final float rightInnerX = rightTipX - dy * tipHalfWidth;
+        final float rightInnerY = Math.max(hitBox.bottom, rightTipY + dx * tipHalfWidth);
 
-        // dragged top left, top right, bottom right, bottom left, then the original hitbox corners
-        final float[] xs = {
-                Math.max(minLeft, left - topPullX * left),
-                Math.min(maxRight, right + topPullX * (keyboardWidth - right)),
-                Math.min(maxRight, right + pullX * (keyboardWidth - right)),
-                Math.max(minLeft, left - pullX * left),
-                hitBox.left, hitBox.right, hitBox.right, hitBox.left
-        };
-        final float[] ys = {
-                Math.min(maxBottom, top + topPullY * (keyboardHeight - top)),
-                Math.min(maxBottom, top + topPullY * (keyboardHeight - top)),
-                Math.min(maxBottom, bottom + pullY * (keyboardHeight - bottom)),
-                Math.min(maxBottom, bottom + pullY * (keyboardHeight - bottom)),
-                hitBox.top, hitBox.top, hitBox.bottom, hitBox.bottom
-        };
-        final int[] hull = convexHull(xs, ys);
-        final float[] hullXs = new float[hull.length];
-        final float[] hullYs = new float[hull.length];
-        for (int i = 0; i < hull.length; i++) {
-            hullXs[i] = xs[hull[i]];
-            hullYs[i] = ys[hull[i]];
+        // left lobe towards bottom left corner; outward normal points up and left
+        dx = -hitBox.left;
+        dy = keyboardHeight - hitBox.bottom;
+        length = Math.max(1f, (float) Math.hypot(dx, dy));
+        dx /= length;
+        dy /= length;
+        final float leftTipX = hitBox.left + dx * lobeLength;
+        final float leftTipY = hitBox.bottom + dy * lobeLength;
+        final float leftOuterX = leftTipX - dy * tipHalfWidth;
+        final float leftOuterY = leftTipY + dx * tipHalfWidth;
+        final float leftInnerX = leftTipX + dy * tipHalfWidth;
+        final float leftInnerY = Math.max(hitBox.bottom, leftTipY - dx * tipHalfWidth);
+
+        final float notchY = hitBox.bottom + NOTCH_DEPTH_RATIO * lobeLength;
+        final int topPoints = domed ? DOME_SEGMENTS + 1 : 2;
+        final float domeHeight = 2 * weight * keyHeight;
+        final float[] restXs = domed
+                ? new float[] { hitBox.right, hitBox.left }
+                : new float[] { hitBox.right, rightOuterX, rightInnerX, hitBox.exactCenterX(), leftInnerX, leftOuterX, hitBox.left };
+        final float[] restYs = domed
+                ? new float[] { hitBox.bottom, hitBox.bottom }
+                : new float[] { shoulderY, rightOuterY, rightInnerY, notchY, leftInnerY, leftOuterY, shoulderY };
+        final float[] xs = new float[topPoints + restXs.length];
+        final float[] ys = new float[topPoints + restYs.length];
+        // clockwise from top left; the dome is a parabola over the top edge
+        for (int i = 0; i < topPoints; i++) {
+            final float t = i / (float) (topPoints - 1);
+            xs[i] = hitBox.left + t * hitBox.width();
+            ys[i] = hitBox.top - (domed ? domeHeight * 4 * t * (1 - t) : 0f);
         }
-        return roundedPolygon(hullXs, hullYs, CORNER_RADIUS_RATIO * Math.min(keyWidth, keyHeight));
-    }
-
-    /** Andrew's monotone chain; returns indices of hull vertices in order, without collinear points. */
-    private static int[] convexHull(final float[] xs, final float[] ys) {
-        final int n = xs.length;
-        final Integer[] order = new Integer[n];
-        for (int i = 0; i < n; i++) order[i] = i;
-        java.util.Arrays.sort(order, (a, b) -> xs[a] != xs[b] ? Float.compare(xs[a], xs[b]) : Float.compare(ys[a], ys[b]));
-        final int[] hull = new int[2 * n];
-        int size = 0;
-        for (int pass = 0; pass < 2; pass++) {
-            final int start = size;
-            for (int k = 0; k < n; k++) {
-                final int p = order[pass == 0 ? k : n - 1 - k];
-                while (size >= start + 2 && cross(xs, ys, hull[size - 2], hull[size - 1], p) <= 0f) size--;
-                hull[size++] = p;
-            }
-            size--; // last point is the first point of the other chain
-        }
-        return java.util.Arrays.copyOf(hull, Math.max(size, 0));
-    }
-
-    private static float cross(final float[] xs, final float[] ys, final int o, final int a, final int b) {
-        return (xs[a] - xs[o]) * (ys[b] - ys[o]) - (ys[a] - ys[o]) * (xs[b] - xs[o]);
+        System.arraycopy(restXs, 0, xs, topPoints, restXs.length);
+        System.arraycopy(restYs, 0, ys, topPoints, restYs.length);
+        return roundedPolygon(xs, ys, CORNER_RADIUS_RATIO * Math.min(keyWidth, keyHeight));
     }
 
     private static Path roundedPolygon(final float[] xs, final float[] ys, final float radius) {
