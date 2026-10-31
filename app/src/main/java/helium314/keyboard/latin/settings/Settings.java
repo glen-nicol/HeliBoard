@@ -174,6 +174,8 @@ public final class Settings implements SharedPreferences.OnSharedPreferenceChang
     public static final String PREF_PREDICTIVE_KEY_MIN_PROBABILITY = "predictive_key_min_probability";
     public static final String PREF_KEY_BASELINE_HITBOX = "key_baseline_hitbox_growth";
     public static final String PREF_SHOW_PREDICTIVE_KEY_HITBOX = "show_predictive_key_hitbox";
+    // stored key predates the Adaptive Key Regions name; kept so the saved value isn't lost
+    public static final String PREF_ADAPTIVE_KEY_REGIONS_ENABLED = "key_hit_regions_enabled";
 
     public static final String PREF_ENABLE_CLIPBOARD_HISTORY = "enable_clipboard_history";
     public static final String PREF_CLIPBOARD_HISTORY_RETENTION_TIME = "clipboard_history_retention_time";

@@ -945,15 +945,49 @@ New dictionary:
     <!-- Title of the setting for how many recent touch contact ellipses and centers to draw -->
     <string name="show_touch_ellipse">Show recent touch areas</string>
     <!-- Title of the setting for choosing the key that overlaps most with the touch area -->
-    <string name="touch_area_hit_detection">Pick key with most overlap with touch area</string>
-    <!-- Title of the setting for enlarging hitboxes of keys likely to be typed next -->
-    <string name="predictive_key_hitbox">Hitbox size of predicted next keys</string>
+    <string name="touch_area_hit_detection">Touch area typing</string>
+    <!-- Description of the setting choosing the key with most overlap with the touch area -->
+    <string name="touch_area_hit_detection_summary">Use the whole finger contact area instead of a single point and the key with the most coverage is pressed. This setting greatly improves the accuracy of Adaptive Key Regions.</string>
+    <!-- Title of the Adaptive Key Regions settings screen -->
+    <string name="adaptive_key_regions_title">Adaptive Key Regions</string>
+    <!-- Summary of the entry linking to the Adaptive Key Regions screen -->
+    <string name="adaptive_key_regions_summary">Adjust which key a touch counts for</string>
+    <!-- Title of the switch enabling Adaptive Key Regions -->
+    <string name="adaptive_key_regions_enable">Use Adaptive Key Regions</string>
+    <!-- Short description on the Adaptive Key Regions screen -->
+    <string name="adaptive_key_regions_short">These settings change the invisible shape of keys to correct for your thumbs\' range of motion and ergonomics.</string>
+    <!-- Expander title for the detailed explanation on the Adaptive Key Regions screen -->
+    <string name="adaptive_key_regions_how_it_works">How it works</string>
+    <!-- Detailed explanation on the Adaptive Key Regions screen -->
+    <string name="adaptive_key_regions_intro">Your thumbs approach the keyboard from the bottom corners of the screen and often land a bit low or towards the side of your intended key. To correct for this, these settings change each key\'s invisible touch region such that they grow towards the bottom corners of the keyboard. This effect can be extended further by enlarging the touch region even more for the most likely next keys to be pressed. Finally, the space bar grows upwards instead to account for the thumb\'s low angle near the limit of its range of motion.</string>
+
+    <!-- Title of the preview on the Adaptive Key Regions screen -->
+    <string name="adaptive_key_regions_preview">Preview</string>
+    <!-- Description of the preview on the Adaptive Key Regions screen -->
+    <string name="adaptive_key_regions_preview_description">Below is a preview of the configured touch regions after typing \"th\". Faint gray outlines show the region of every key and colored outlines show predicted keys\' enlarged region. Adjust the scaling below to fit your needs.</string>
+
+    <!-- Title of the settings section on the Adaptive Key Regions screen -->
+    <string name="adaptive_key_regions_settings">Adjustments</string>
     <!-- Title of the setting for the baseline hitbox growth applied to all typing keys -->
-    <string name="key_baseline_hitbox">Baseline hitbox size of all keys</string>
-    <!-- Title of the setting for the minimum probability a predicted key needs to get an enlarged hitbox -->
-    <string name="predictive_key_min_probability">Minimum probability for showing an enlarged hitbox</string>
+    <string name="key_baseline_hitbox">Touch region scaling of all keys</string>
+    <!-- Description of the baseline hit region setting -->
+    <string name="key_baseline_hitbox_summary">Every key grows to correct for your thumbs\' range of motion from the bottom corners of the screen.</string>
+    <!-- Title of the setting for enlarging hitboxes of keys likely to be typed next -->
+    <string name="predictive_key_hitbox">Additional scaling for predicted keys</string>
+    <!-- Description of the predicted key hit region setting -->
+    <string name="predictive_key_hitbox_summary">Keys likely to be typed next grow even further. This is based on the autocomplete suggestions.</string>
     <!-- Title of the setting for drawing the enlarged hitboxes of predicted next keys -->
-    <string name="show_predictive_key_hitbox">Show enlarged hitboxes of predicted next keys</string>
+    <string name="show_predictive_key_hitbox">Show predicted next key regions on keyboard</string>
+    <!-- Description of the setting drawing predicted key regions on the keyboard -->
+    <string name="show_predictive_key_hitbox_summary">Draw the regions of predicted keys on the keyboard while typing. These are always shown on the preview above for demonstration.</string>
+    <!-- Title of the setting for the minimum probability a predicted key needs to get an enlarged hitbox -->
+    <string name="predictive_key_min_probability">Minimum prediction probability for showing an enlarged hitbox</string>
+    <!-- Description of the minimum probability setting -->
+    <string name="predictive_key_min_probability_summary">Predicted keys below this probability still grow, but are not drawn in the preview or on the keyboard.</string>
+
+    <!-- Label of the text field for trying out the keyboard on the Adaptive Key Regions screen -->
+    <string name="adaptive_key_regions_try_it">Try typing here</string>
+
     <!-- Title of the setting for variable toolbar direction -->
     <string name="var_toolbar_direction">Variable toolbar direction</string>
     <!-- Description of the variable toolbar direction setting -->

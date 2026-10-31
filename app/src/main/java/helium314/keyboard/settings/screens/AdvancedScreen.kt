@@ -90,12 +90,7 @@ fun AdvancedSettingsScreen(
         Settings.PREF_URL_DETECTION,
         Settings.PREF_SHOW_TOUCH_ELLIPSE_COUNT,
         Settings.PREF_TOUCH_AREA_HIT_DETECTION,
-        Settings.PREF_KEY_BASELINE_HITBOX,
-        Settings.PREF_PREDICTIVE_KEY_HITBOX,
-        if (prefs.getInt(Settings.PREF_PREDICTIVE_KEY_HITBOX, Defaults.PREF_PREDICTIVE_KEY_HITBOX) > 100)
-            Settings.PREF_PREDICTIVE_KEY_MIN_PROBABILITY else null,
-        if (prefs.getInt(Settings.PREF_PREDICTIVE_KEY_HITBOX, Defaults.PREF_PREDICTIVE_KEY_HITBOX) > 100)
-            Settings.PREF_SHOW_PREDICTIVE_KEY_HITBOX else null,
+        SettingsWithoutKey.ADAPTIVE_KEY_REGIONS,
         Settings.PREF_ENABLE_HARDWARE_KEYBOARD,
         if (BuildConfig.BUILD_TYPE != "nouserlib") SettingsWithoutKey.LOAD_GESTURE_LIB else null
     )
@@ -296,38 +291,15 @@ fun createAdvancedSettings(context: Context) = listOf(
             description = { it.toString() }
         )
     },
-    Setting(context, Settings.PREF_TOUCH_AREA_HIT_DETECTION, R.string.touch_area_hit_detection) {
+    Setting(context, Settings.PREF_TOUCH_AREA_HIT_DETECTION, R.string.touch_area_hit_detection, R.string.touch_area_hit_detection_summary) {
         SwitchPreference(it, Defaults.PREF_TOUCH_AREA_HIT_DETECTION)
     },
-    Setting(context, Settings.PREF_KEY_BASELINE_HITBOX, R.string.key_baseline_hitbox) { setting ->
-        SliderPreference(
-            name = setting.title,
-            key = setting.key,
-            default = Defaults.PREF_KEY_BASELINE_HITBOX,
-            range = 100f..110f,
-            description = { "$it%" }
-        )
-    },
-    Setting(context, Settings.PREF_PREDICTIVE_KEY_HITBOX, R.string.predictive_key_hitbox) { setting ->
-        SliderPreference(
-            name = setting.title,
-            key = setting.key,
-            default = Defaults.PREF_PREDICTIVE_KEY_HITBOX,
-            range = 100f..120f,
-            description = { "$it%" }
-        )
-    },
-    Setting(context, Settings.PREF_PREDICTIVE_KEY_MIN_PROBABILITY, R.string.predictive_key_min_probability) { setting ->
-        SliderPreference(
-            name = setting.title,
-            key = setting.key,
-            default = Defaults.PREF_PREDICTIVE_KEY_MIN_PROBABILITY,
-            range = 0f..50f,
-            description = { "$it%" }
-        )
-    },
-    Setting(context, Settings.PREF_SHOW_PREDICTIVE_KEY_HITBOX, R.string.show_predictive_key_hitbox) {
-        SwitchPreference(it, Defaults.PREF_SHOW_PREDICTIVE_KEY_HITBOX)
+    Setting(context, SettingsWithoutKey.ADAPTIVE_KEY_REGIONS, R.string.adaptive_key_regions_title, R.string.adaptive_key_regions_summary) {
+        Preference(
+            name = it.title,
+            description = it.description,
+            onClick = { SettingsDestination.navigateTo(SettingsDestination.AdaptiveKeyRegions) }
+        ) { NextScreenIcon() }
     },
     Setting(context, Settings.PREF_ENABLE_HARDWARE_KEYBOARD, R.string.prefs_enable_hardware_keyboard) {
         SwitchPreference(it, Defaults.PREF_ENABLE_HARDWARE_KEYBOARD)

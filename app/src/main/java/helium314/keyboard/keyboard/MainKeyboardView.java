@@ -298,9 +298,14 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
 
     public void setKeyProbabilities(@NonNull final java.util.Map<Integer, Float> probabilities) {
         mKeyDetector.setKeyProbabilities(probabilities);
-        if (Settings.getValues().mShowPredictiveKeyHitbox) {
+        if (Settings.getValues().mAkrShowPredictiveKeyHitbox) {
             invalidate();
         }
+    }
+
+    public void refreshKeyRegions() {
+        mKeyDetector.refreshKeyRegions();
+        invalidate();
     }
 
     private final Path mKeyWeightRegionPath = new Path();
@@ -380,10 +385,10 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
 
     private void drawKeyWeightRegions(@NonNull final Canvas canvas) {
         final Keyboard keyboard = getKeyboard();
-        if (keyboard == null || !Settings.getValues().mShowPredictiveKeyHitbox) {
+        if (keyboard == null || !Settings.getValues().mAkrShowPredictiveKeyHitbox) {
             return;
         }
-        final float maxWeight = Math.max(Settings.getValues().mPredictiveKeyHitbox, 0.01f);
+        final float maxWeight = Math.max(Settings.getValues().mAkrPredictiveKeyHitboxScale, 0.01f);
         for (final Key key : keyboard.getSortedKeys()) {
             final float weight = mKeyDetector.getWeightedKeyRegion(key, mKeyWeightRegionPath);
             if (weight <= 0f) {

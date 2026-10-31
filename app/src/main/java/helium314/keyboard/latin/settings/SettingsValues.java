@@ -89,10 +89,10 @@ public class SettingsValues {
     public final boolean mTouchpadEdgeScroll;
     public final int mShowTouchEllipseCount;
     public final boolean mTouchAreaHitDetection;
-    public final float mPredictiveKeyHitbox;
-    public final float mKeyBaselineHitbox;
-    public final float mPredictiveKeyMinProbability;
-    public final boolean mShowPredictiveKeyHitbox;
+    public final float mAkrPredictiveKeyHitboxScale;
+    public final float mAkrKeyBaselineHitboxScale;
+    public final float mAkrPredictiveKeyMinProbability;
+    public final boolean mAkrShowPredictiveKeyHitbox;
     public final int mDeleteSwipe;
     public final boolean mAutospaceAfterPunctuation;
     public final boolean mAutospaceAfterSuggestion;
@@ -286,12 +286,15 @@ public class SettingsValues {
             Defaults.PREF_TOUCHPAD_SENSITIVITY);
         mTouchpadEdgeScroll = prefs.getBoolean(Settings.PREF_TOUCHPAD_EDGE_SCROLL, Defaults.PREF_TOUCHPAD_EDGE_SCROLL);
         mShowTouchEllipseCount = prefs.getInt(Settings.PREF_SHOW_TOUCH_ELLIPSE_COUNT, Defaults.PREF_SHOW_TOUCH_ELLIPSE_COUNT);
+        final boolean hitRegionsEnabled = prefs.getBoolean(Settings.PREF_ADAPTIVE_KEY_REGIONS_ENABLED, Defaults.PREF_ADAPTIVE_KEY_REGIONS_ENABLED);
         mTouchAreaHitDetection = prefs.getBoolean(Settings.PREF_TOUCH_AREA_HIT_DETECTION, Defaults.PREF_TOUCH_AREA_HIT_DETECTION);
-        mKeyBaselineHitbox = Math.max(0, prefs.getInt(Settings.PREF_KEY_BASELINE_HITBOX, Defaults.PREF_KEY_BASELINE_HITBOX) - 100) / 100f;
+        mAkrKeyBaselineHitboxScale = !hitRegionsEnabled ? 0f
+                                                        : Math.max(0, prefs.getInt(Settings.PREF_KEY_BASELINE_HITBOX, Defaults.PREF_ADAPTIVE_KEY_REGIONS_KEY_BASELINE_HITBOX_SCALE) - 100) / 100f;
         // Stored as growth percentage (100 = no growth), converted to max extension in typical key sizes.
-        mPredictiveKeyHitbox = Math.max(0, prefs.getInt(Settings.PREF_PREDICTIVE_KEY_HITBOX, Defaults.PREF_PREDICTIVE_KEY_HITBOX) - 100) / 100f;
-        mPredictiveKeyMinProbability = prefs.getInt(Settings.PREF_PREDICTIVE_KEY_MIN_PROBABILITY, Defaults.PREF_PREDICTIVE_KEY_MIN_PROBABILITY) / 100f;
-        mShowPredictiveKeyHitbox = prefs.getBoolean(Settings.PREF_SHOW_PREDICTIVE_KEY_HITBOX, Defaults.PREF_SHOW_PREDICTIVE_KEY_HITBOX);
+        mAkrPredictiveKeyHitboxScale = !hitRegionsEnabled ? 0f
+                                                          : Math.max(0, prefs.getInt(Settings.PREF_PREDICTIVE_KEY_HITBOX, Defaults.PREF_ADAPTIVE_KEY_REGIONS_PREDICTIVE_KEY_HITBOX_SCALE) - 100) / 100f;
+        mAkrPredictiveKeyMinProbability = prefs.getInt(Settings.PREF_PREDICTIVE_KEY_MIN_PROBABILITY, Defaults.PREF_ADAPTIVE_KEY_REGIONS_PREDICTIVE_KEY_MIN_PROBABILITY) / 100f;
+        mAkrShowPredictiveKeyHitbox = hitRegionsEnabled && prefs.getBoolean(Settings.PREF_SHOW_PREDICTIVE_KEY_HITBOX, Defaults.PREF_ADAPTIVE_KEY_REGIONS_SHOW_PREDICTIVE_KEY_HITBOX);
         mDeleteSwipe = prefs.getInt(Settings.PREF_DELETE_SWIPE, Defaults.PREF_DELETE_SWIPE);
         mAutospaceAfterPunctuation = prefs.getBoolean(Settings.PREF_AUTOSPACE_AFTER_PUNCTUATION, Defaults.PREF_AUTOSPACE_AFTER_PUNCTUATION);
         mAutospaceAfterSuggestion = prefs.getBoolean(Settings.PREF_AUTOSPACE_AFTER_SUGGESTION, Defaults.PREF_AUTOSPACE_AFTER_SUGGESTION);

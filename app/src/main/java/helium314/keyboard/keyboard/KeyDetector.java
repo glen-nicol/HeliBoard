@@ -111,6 +111,43 @@ public class KeyDetector {
         updateKeyWeights();
     }
 
+    /** Rebuilds the regions, e.g. after the hit region settings changed. */
+    public void refreshKeyRegions() {
+        updateKeyWeights();
+    }
+
+    // how far a region's strength reaches beyond the key, in typical key sizes per unit of growth
+    public static float maxStretchX(final float totalGrowth, final float keyWidth) {
+        return 3f * totalGrowth * keyWidth;
+    }
+
+    public static float maxStretchY(final float totalGrowth, final float keyHeight) {
+        return 2f * totalGrowth * keyHeight;
+    }
+
+    /**
+     * Predicted growth per key: {@code scale} times the key's probability relative to the most
+     * probable key whose region could touch it (gap within {@code maxGapX} / {@code maxGapY}).
+     */
+    public static float[] predictedWeights(final Rect[] hitBoxes, final float[] probabilities,
+            final float scale, final float maxGapX, final float maxGapY) {
+        final float[] result = new float[hitBoxes.length];
+        for (int i = 0; i < hitBoxes.length; i++) {
+            if (probabilities[i] <= 0f) continue;
+            float maxNearbyProbability = probabilities[i];
+            for (int j = 0; j < hitBoxes.length; j++) {
+                if (probabilities[j] <= 0f) continue;
+                final int gapX = Math.max(hitBoxes[j].left - hitBoxes[i].right, hitBoxes[i].left - hitBoxes[j].right);
+                final int gapY = Math.max(hitBoxes[j].top - hitBoxes[i].bottom, hitBoxes[i].top - hitBoxes[j].bottom);
+                if (gapX <= maxGapX && gapY <= maxGapY) {
+                    maxNearbyProbability = Math.max(maxNearbyProbability, probabilities[j]);
+                }
+            }
+            result[i] = scale * probabilities[i] / maxNearbyProbability;
+        }
+        return result;
+    }
+
     private static boolean hasBaselineRegion(final Key key) {
         return !key.isModifier() && key.getCode() >= Constants.CODE_SPACE;
     }
@@ -121,8 +158,8 @@ public class KeyDetector {
      * relative to the most probable key among them.
      */
     private void updateKeyWeights() {
-        final float scale = Settings.getValues().mPredictiveKeyHitbox;
-        final float baseline = Settings.getValues().mKeyBaselineHitbox;
+        final float scale = Settings.getValues().mAkrPredictiveKeyHitboxScale;
+        final float baseline = Settings.getValues().mAkrKeyBaselineHitboxScale;
         if (mKeyboard == null || (baseline <= 0f && (mKeyProbabilities.isEmpty() || scale <= 0f))) {
             mKeyWeights = Collections.emptyMap();
             mKeyTotalWeights = Collections.emptyMap();
@@ -133,8 +170,8 @@ public class KeyDetector {
         }
         final int keyWidth = mKeyboard.mMostCommonKeyWidth;
         final int keyHeight = mKeyboard.mMostCommonKeyHeight;
-        mMaxStretchX = 3f * (scale + baseline) * keyWidth;
-        mMaxStretchY = 2 * (scale + baseline) * keyHeight;
+        mMaxStretchX = maxStretchX(scale + baseline, keyWidth);
+        mMaxStretchY = maxStretchY(scale + baseline, keyHeight);
 
         final java.util.ArrayList<Key> predictedKeys = new java.util.ArrayList<>();
         if (scale > 0f) {
@@ -142,23 +179,18 @@ public class KeyDetector {
                 if (getKeyProbability(key) > 0f) predictedKeys.add(key);
             }
         }
-        final float maxGapX = 2 * mMaxStretchX;
-        final float maxGapY = 2 * mMaxStretchY;
+        final Rect[] hitBoxes = new Rect[predictedKeys.size()];
+        final float[] probabilities = new float[predictedKeys.size()];
+        for (int i = 0; i < hitBoxes.length; i++) {
+            hitBoxes[i] = predictedKeys.get(i).getHitBox();
+            probabilities[i] = getKeyProbability(predictedKeys.get(i));
+        }
+        final float[] predicted = predictedWeights(hitBoxes, probabilities, scale, 2 * mMaxStretchX, 2 * mMaxStretchY);
         final java.util.HashMap<Key, Float> totalWeights = new java.util.HashMap<>();
         final java.util.HashMap<Integer, Float> weights = new java.util.HashMap<>();
-        for (final Key key : predictedKeys) {
-            final float probability = getKeyProbability(key);
-            float maxNearbyProbability = probability;
-            final Rect hitBox = key.getHitBox();
-            for (final Key other : predictedKeys) {
-                final Rect otherHitBox = other.getHitBox();
-                final int gapX = Math.max(otherHitBox.left - hitBox.right, hitBox.left - otherHitBox.right);
-                final int gapY = Math.max(otherHitBox.top - hitBox.bottom, hitBox.top - otherHitBox.bottom);
-                if (gapX <= maxGapX && gapY <= maxGapY) {
-                    maxNearbyProbability = Math.max(maxNearbyProbability, getKeyProbability(other));
-                }
-            }
-            final float weight = scale * probability / maxNearbyProbability;
+        for (int i = 0; i < hitBoxes.length; i++) {
+            final Key key = predictedKeys.get(i);
+            final float weight = predicted[i];
             totalWeights.put(key, weight);
             final int code = Character.toLowerCase(key.getCode());
             final Float previous = weights.get(code);
@@ -167,8 +199,8 @@ public class KeyDetector {
         if (baseline > 0f) {
             for (final Key key : mKeyboard.getSortedKeys()) {
                 if (!hasBaselineRegion(key)) continue;
-                final Float predicted = totalWeights.get(key);
-                totalWeights.put(key, baseline + (predicted == null ? 0f : predicted));
+                final Float predictedWeight = totalWeights.get(key);
+                totalWeights.put(key, baseline + (predictedWeight == null ? 0f : predictedWeight));
             }
         }
 
@@ -197,16 +229,18 @@ public class KeyDetector {
         mKeyBaselinePaths = baselinePaths;
     }
 
+    private Path buildKeyRegionPath(final Rect hitBox, final float weight, final boolean domed) {
+        return buildRegionPath(hitBox, weight, domed, mKeyboard.mMostCommonKeyWidth, mKeyboard.mMostCommonKeyHeight,
+                mKeyboard.mOccupiedWidth, mKeyboard.mOccupiedHeight);
+    }
+
     /**
      * The key with two lobes growing out of its lower sides, one towards each bottom corner of the
      * keyboard, and a notch between them below the key. The original key area is always kept.
      * If {@code domed}, there are no lobes and the top edge bulges upwards, highest in the center.
      */
-    private Path buildKeyRegionPath(final Rect hitBox, final float weight, final boolean domed) {
-        final float keyWidth = mKeyboard.mMostCommonKeyWidth;
-        final float keyHeight = mKeyboard.mMostCommonKeyHeight;
-        final float keyboardWidth = mKeyboard.mOccupiedWidth;
-        final float keyboardHeight = mKeyboard.mOccupiedHeight;
+    public static Path buildRegionPath(final Rect hitBox, final float weight, final boolean domed,
+            final float keyWidth, final float keyHeight, final float keyboardWidth, final float keyboardHeight) {
         final float lobeLength = 2 * weight * keyWidth;
         final float tipHalfWidth = LOBE_TIP_RATIO * lobeLength;
         final float shoulderY = hitBox.top + LOBE_SHOULDER_RATIO * hitBox.height();
@@ -297,7 +331,7 @@ public class KeyDetector {
      */
     public float getWeightedKeyRegion(final Key key, final Path out) {
         final Path path = mKeyPaths.get(key);
-        if (path == null || getKeyProbability(key) < Settings.getValues().mPredictiveKeyMinProbability) {
+        if (path == null || getKeyProbability(key) < Settings.getValues().mAkrPredictiveKeyMinProbability) {
             return 0f;
         }
         out.set(path);
