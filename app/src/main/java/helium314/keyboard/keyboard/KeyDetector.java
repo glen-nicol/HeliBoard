@@ -38,10 +38,14 @@ public class KeyDetector {
     private int mCorrectionY;
     // lowercase code point -> probability of being typed next
     private Map<Integer, Float> mKeyProbabilities = Collections.emptyMap();
-    // lowercase code point -> expansion as fraction of the most common key size
+    // lowercase code point -> predicted expansion as fraction of the most common key size
     private Map<Integer, Float> mKeyWeights = Collections.emptyMap();
+    // baseline plus predicted expansion, for every key that has a region
+    private Map<Key, Float> mKeyTotalWeights = Collections.emptyMap();
     private Map<Key, Region> mKeyRegions = Collections.emptyMap();
     private Map<Key, Path> mKeyPaths = Collections.emptyMap();
+    // baseline-only outlines of predicted keys, for display
+    private Map<Key, Path> mKeyBaselinePaths = Collections.emptyMap();
     private float mMaxStretchX = 1f;
     private float mMaxStretchY = 1f;
 
@@ -104,38 +108,43 @@ public class KeyDetector {
 
     public void clearKeyWeights() {
         mKeyProbabilities = Collections.emptyMap();
-        mKeyWeights = Collections.emptyMap();
-        mKeyRegions = Collections.emptyMap();
-        mKeyPaths = Collections.emptyMap();
+        updateKeyWeights();
+    }
+
+    private static boolean hasBaselineRegion(final Key key) {
+        return !key.isModifier() && key.getCode() >= Constants.CODE_SPACE;
     }
 
     /**
-     * Isolated predicted keys get the full growth; predicted keys whose enlarged regions could touch
-     * share it according to probability, relative to the most probable key among them.
+     * All typing keys get the baseline growth. Isolated predicted keys get the full predicted growth
+     * on top; predicted keys whose enlarged regions could touch share it according to probability,
+     * relative to the most probable key among them.
      */
     private void updateKeyWeights() {
         final float scale = Settings.getValues().mPredictiveKeyHitbox;
-        if (mKeyboard == null || mKeyProbabilities.isEmpty() || scale <= 0f) {
+        final float baseline = Settings.getValues().mKeyBaselineHitbox;
+        if (mKeyboard == null || (baseline <= 0f && (mKeyProbabilities.isEmpty() || scale <= 0f))) {
             mKeyWeights = Collections.emptyMap();
+            mKeyTotalWeights = Collections.emptyMap();
             mKeyRegions = Collections.emptyMap();
             mKeyPaths = Collections.emptyMap();
+            mKeyBaselinePaths = Collections.emptyMap();
             return;
         }
         final int keyWidth = mKeyboard.mMostCommonKeyWidth;
         final int keyHeight = mKeyboard.mMostCommonKeyHeight;
-        // A lobe reaches at most twice the weight beyond the original key.
-        mMaxStretchX = 3f * scale * keyWidth;
-        mMaxStretchY = 2 * scale * keyHeight;
+        mMaxStretchX = 3f * (scale + baseline) * keyWidth;
+        mMaxStretchY = 2 * (scale + baseline) * keyHeight;
 
-        final float minProbability = Settings.getValues().mPredictiveKeyMinProbability;
         final java.util.ArrayList<Key> predictedKeys = new java.util.ArrayList<>();
-        for (final Key key : mKeyboard.getSortedKeys()) {
-            final float probability = getKeyProbability(key);
-            if (probability > 0f && probability >= minProbability) predictedKeys.add(key);
+        if (scale > 0f) {
+            for (final Key key : mKeyboard.getSortedKeys()) {
+                if (getKeyProbability(key) > 0f) predictedKeys.add(key);
+            }
         }
         final float maxGapX = 2 * mMaxStretchX;
         final float maxGapY = 2 * mMaxStretchY;
-        final java.util.HashMap<Key, Float> keyWeights = new java.util.HashMap<>();
+        final java.util.HashMap<Key, Float> totalWeights = new java.util.HashMap<>();
         final java.util.HashMap<Integer, Float> weights = new java.util.HashMap<>();
         for (final Key key : predictedKeys) {
             final float probability = getKeyProbability(key);
@@ -150,29 +159,42 @@ public class KeyDetector {
                 }
             }
             final float weight = scale * probability / maxNearbyProbability;
-            keyWeights.put(key, weight);
+            totalWeights.put(key, weight);
             final int code = Character.toLowerCase(key.getCode());
             final Float previous = weights.get(code);
             weights.put(code, previous == null ? weight : Math.max(previous, weight));
         }
+        if (baseline > 0f) {
+            for (final Key key : mKeyboard.getSortedKeys()) {
+                if (!hasBaselineRegion(key)) continue;
+                final Float predicted = totalWeights.get(key);
+                totalWeights.put(key, baseline + (predicted == null ? 0f : predicted));
+            }
+        }
 
         final java.util.HashMap<Key, Region> regions = new java.util.HashMap<>();
         final java.util.HashMap<Key, Path> paths = new java.util.HashMap<>();
+        final java.util.HashMap<Key, Path> baselinePaths = new java.util.HashMap<>();
         final RectF bounds = new RectF();
-        for (final Map.Entry<Key, Float> entry : keyWeights.entrySet()) {
+        for (final Map.Entry<Key, Float> entry : totalWeights.entrySet()) {
             final Key key = entry.getKey();
-            final Path path = buildKeyRegionPath(key.getHitBox(), entry.getValue(),
-                    key.getCode() == Constants.CODE_SPACE);
+            final boolean isSpace = key.getCode() == Constants.CODE_SPACE;
+            final Path path = buildKeyRegionPath(key.getHitBox(), entry.getValue(), isSpace);
+            if (baseline > 0f && weights.containsKey(Character.toLowerCase(key.getCode()))) {
+                baselinePaths.put(key, buildKeyRegionPath(key.getHitBox(), baseline, isSpace));
+            }
             path.computeBounds(bounds, true);
             final Region region = new Region();
             region.setPath(path, new Region((int) Math.floor(bounds.left) - 1, (int) Math.floor(bounds.top) - 1,
                     (int) Math.ceil(bounds.right) + 1, (int) Math.ceil(bounds.bottom) + 1));
-            regions.put(entry.getKey(), region);
-            paths.put(entry.getKey(), path);
+            regions.put(key, region);
+            paths.put(key, path);
         }
         mKeyWeights = weights;
+        mKeyTotalWeights = totalWeights;
         mKeyRegions = regions;
         mKeyPaths = paths;
+        mKeyBaselinePaths = baselinePaths;
     }
 
     /**
@@ -270,16 +292,28 @@ public class KeyDetector {
 
     /**
      * Sets {@code out} to the outline of the region a weighted key claims, in view coordinates.
-     * @return the key weight, or 0 if the key has no weight (and {@code out} is untouched).
+     * Keys below the minimum probability still have a region, but it isn't returned for display.
+     * @return the key weight, or 0 if there is nothing to show (and {@code out} is untouched).
      */
     public float getWeightedKeyRegion(final Key key, final Path out) {
         final Path path = mKeyPaths.get(key);
-        if (path == null) {
+        if (path == null || getKeyProbability(key) < Settings.getValues().mPredictiveKeyMinProbability) {
             return 0f;
         }
         out.set(path);
         out.offset(-mCorrectionX, -mCorrectionY);
         return getKeyWeight(key);
+    }
+
+    /** Sets {@code out} to the baseline-only outline of a predicted key in view coordinates, if there is one. */
+    public boolean getBaselineKeyRegion(final Key key, final Path out) {
+        final Path path = mKeyBaselinePaths.get(key);
+        if (path == null) {
+            return false;
+        }
+        out.set(path);
+        out.offset(-mCorrectionX, -mCorrectionY);
+        return true;
     }
 
     /**
@@ -350,16 +384,16 @@ public class KeyDetector {
                 primaryKey = key;
             }
         }
-        if (mKeyWeights.isEmpty()) {
+        if (mKeyRegions.isEmpty()) {
             return primaryKey;
         }
         return detectWeightedKey(touchX, touchY, primaryKey);
     }
 
     /**
-     * Lets predicted keys claim touches within their enlarged, dragged region. A claiming key wins
-     * over the key actually hit if its weight, reduced by how far out the touch is, exceeds the hit
-     * key's weight.
+     * Lets keys claim touches within their enlarged region. A claiming key wins over the key actually
+     * hit if its total (baseline + predicted) weight, reduced by how far out the touch is, exceeds
+     * the hit key's predicted weight.
      */
     private Key detectWeightedKey(final int x, final int y, final Key primaryKey) {
         Key bestKey = primaryKey;
@@ -375,7 +409,7 @@ public class KeyDetector {
             // capped below 1 so that every point inside the region can beat an unpredicted key
             final float relativeDistance = Math.min(0.95f,
                     Math.max(outsideX / mMaxStretchX, outsideY / mMaxStretchY));
-            final float strength = getKeyWeight(key) * (1f - relativeDistance);
+            final float strength = mKeyTotalWeights.get(key) * (1f - relativeDistance);
             if (strength > bestStrength) {
                 bestStrength = strength;
                 bestKey = key;

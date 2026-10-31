@@ -306,6 +306,8 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
     private final Path mKeyWeightRegionPath = new Path();
     private final Paint mKeyWeightRegionPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint mKeyWeightLabelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final android.graphics.DashPathEffect mBaselineDashEffect =
+            new android.graphics.DashPathEffect(new float[] { 6f, 6f }, 0f);
     {
         mKeyWeightLabelPaint.setColor(Color.rgb(255, 0, 128));
         mKeyWeightLabelPaint.setTextAlign(Align.RIGHT);
@@ -395,6 +397,11 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
             mKeyWeightRegionPaint.setStrokeWidth(2f);
             mKeyWeightRegionPaint.setColor(Color.argb(Math.min(255, alpha * 2), 255, 0, 128));
             canvas.drawPath(mKeyWeightRegionPath, mKeyWeightRegionPaint);
+            if (mKeyDetector.getBaselineKeyRegion(key, mKeyWeightRegionPath)) {
+                mKeyWeightRegionPaint.setPathEffect(mBaselineDashEffect);
+                canvas.drawPath(mKeyWeightRegionPath, mKeyWeightRegionPaint);
+                mKeyWeightRegionPaint.setPathEffect(null);
+            }
 
             final int percent = Math.round(mKeyDetector.getKeyProbability(key) * 100);
             mKeyWeightLabelPaint.setTextSize(TypedValue.applyDimension(

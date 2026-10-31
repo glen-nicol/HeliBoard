@@ -948,8 +948,10 @@ New dictionary:
     <string name="touch_area_hit_detection">Pick key with most overlap with touch area</string>
     <!-- Title of the setting for enlarging hitboxes of keys likely to be typed next -->
     <string name="predictive_key_hitbox">Hitbox size of predicted next keys</string>
+    <!-- Title of the setting for the baseline hitbox growth applied to all typing keys -->
+    <string name="key_baseline_hitbox">Baseline hitbox size of all keys</string>
     <!-- Title of the setting for the minimum probability a predicted key needs to get an enlarged hitbox -->
-    <string name="predictive_key_min_probability">Minimum probability for enlarging a predicted key</string>
+    <string name="predictive_key_min_probability">Minimum probability for showing an enlarged hitbox</string>
     <!-- Title of the setting for drawing the enlarged hitboxes of predicted next keys -->
     <string name="show_predictive_key_hitbox">Show enlarged hitboxes of predicted next keys</string>
     <!-- Title of the setting for variable toolbar direction -->

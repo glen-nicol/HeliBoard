@@ -90,6 +90,7 @@ fun AdvancedSettingsScreen(
         Settings.PREF_URL_DETECTION,
         Settings.PREF_SHOW_TOUCH_ELLIPSE_COUNT,
         Settings.PREF_TOUCH_AREA_HIT_DETECTION,
+        Settings.PREF_KEY_BASELINE_HITBOX,
         Settings.PREF_PREDICTIVE_KEY_HITBOX,
         if (prefs.getInt(Settings.PREF_PREDICTIVE_KEY_HITBOX, Defaults.PREF_PREDICTIVE_KEY_HITBOX) > 100)
             Settings.PREF_PREDICTIVE_KEY_MIN_PROBABILITY else null,
@@ -298,12 +299,21 @@ fun createAdvancedSettings(context: Context) = listOf(
     Setting(context, Settings.PREF_TOUCH_AREA_HIT_DETECTION, R.string.touch_area_hit_detection) {
         SwitchPreference(it, Defaults.PREF_TOUCH_AREA_HIT_DETECTION)
     },
+    Setting(context, Settings.PREF_KEY_BASELINE_HITBOX, R.string.key_baseline_hitbox) { setting ->
+        SliderPreference(
+            name = setting.title,
+            key = setting.key,
+            default = Defaults.PREF_KEY_BASELINE_HITBOX,
+            range = 100f..110f,
+            description = { "$it%" }
+        )
+    },
     Setting(context, Settings.PREF_PREDICTIVE_KEY_HITBOX, R.string.predictive_key_hitbox) { setting ->
         SliderPreference(
             name = setting.title,
             key = setting.key,
             default = Defaults.PREF_PREDICTIVE_KEY_HITBOX,
-            range = 100f..133f,
+            range = 100f..120f,
             description = { "$it%" }
         )
     },

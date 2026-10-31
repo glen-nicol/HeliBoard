@@ -90,6 +90,7 @@ public class SettingsValues {
     public final int mShowTouchEllipseCount;
     public final boolean mTouchAreaHitDetection;
     public final float mPredictiveKeyHitbox;
+    public final float mKeyBaselineHitbox;
     public final float mPredictiveKeyMinProbability;
     public final boolean mShowPredictiveKeyHitbox;
     public final int mDeleteSwipe;
@@ -286,6 +287,7 @@ public class SettingsValues {
         mTouchpadEdgeScroll = prefs.getBoolean(Settings.PREF_TOUCHPAD_EDGE_SCROLL, Defaults.PREF_TOUCHPAD_EDGE_SCROLL);
         mShowTouchEllipseCount = prefs.getInt(Settings.PREF_SHOW_TOUCH_ELLIPSE_COUNT, Defaults.PREF_SHOW_TOUCH_ELLIPSE_COUNT);
         mTouchAreaHitDetection = prefs.getBoolean(Settings.PREF_TOUCH_AREA_HIT_DETECTION, Defaults.PREF_TOUCH_AREA_HIT_DETECTION);
+        mKeyBaselineHitbox = Math.max(0, prefs.getInt(Settings.PREF_KEY_BASELINE_HITBOX, Defaults.PREF_KEY_BASELINE_HITBOX) - 100) / 100f;
         // Stored as growth percentage (100 = no growth), converted to max extension in typical key sizes.
         mPredictiveKeyHitbox = Math.max(0, prefs.getInt(Settings.PREF_PREDICTIVE_KEY_HITBOX, Defaults.PREF_PREDICTIVE_KEY_HITBOX) - 100) / 100f;
         mPredictiveKeyMinProbability = prefs.getInt(Settings.PREF_PREDICTIVE_KEY_MIN_PROBABILITY, Defaults.PREF_PREDICTIVE_KEY_MIN_PROBABILITY) / 100f;
