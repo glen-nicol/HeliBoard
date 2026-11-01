@@ -298,9 +298,24 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
 
     public void setKeyProbabilities(@NonNull final java.util.Map<Integer, Float> probabilities) {
         mKeyDetector.setKeyProbabilities(probabilities);
-        if (Settings.getValues().mAkrShowPredictiveKeyHitbox) {
+        if (shouldDrawKeyRegions()) {
             invalidate();
         }
+    }
+
+    // Set while the Adaptive Key Regions settings screen is open; independent of the user's preference.
+    private static boolean sShowRegionsForSettings;
+
+    public static void setShowRegionsForSettings(final boolean show) {
+        sShowRegionsForSettings = show;
+        final MainKeyboardView view = KeyboardSwitcher.getInstance().getMainKeyboardView();
+        if (view != null) {
+            view.invalidate();
+        }
+    }
+
+    private boolean shouldDrawKeyRegions() {
+        return sShowRegionsForSettings || Settings.getValues().mAkrShowPredictiveKeyHitbox;
     }
 
     public void refreshKeyRegions() {
@@ -313,6 +328,7 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
     private final Paint mKeyWeightLabelPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final android.graphics.DashPathEffect mBaselineDashEffect =
             new android.graphics.DashPathEffect(new float[] { 6f, 6f }, 0f);
+    private static final int BASELINE_REGION_COLOR = Color.rgb(255, 140, 0);
     {
         mKeyWeightLabelPaint.setColor(Color.rgb(255, 0, 128));
         mKeyWeightLabelPaint.setTextAlign(Align.RIGHT);
@@ -385,13 +401,21 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
 
     private void drawKeyWeightRegions(@NonNull final Canvas canvas) {
         final Keyboard keyboard = getKeyboard();
-        if (keyboard == null || !Settings.getValues().mAkrShowPredictiveKeyHitbox) {
+        if (keyboard == null || !shouldDrawKeyRegions()) {
             return;
         }
         final float maxWeight = Math.max(Settings.getValues().mAkrPredictiveKeyHitboxScale, 0.01f);
         for (final Key key : keyboard.getSortedKeys()) {
             final float weight = mKeyDetector.getWeightedKeyRegion(key, mKeyWeightRegionPath);
             if (weight <= 0f) {
+                if (sShowRegionsForSettings && mKeyDetector.getKeyRegionOutline(key, mKeyWeightRegionPath)) {
+                    mKeyWeightRegionPaint.setStyle(Paint.Style.STROKE);
+                    mKeyWeightRegionPaint.setStrokeWidth(2f);
+                    mKeyWeightRegionPaint.setColor(BASELINE_REGION_COLOR);
+                    mKeyWeightRegionPaint.setPathEffect(mBaselineDashEffect);
+                    canvas.drawPath(mKeyWeightRegionPath, mKeyWeightRegionPaint);
+                    mKeyWeightRegionPaint.setPathEffect(null);
+                }
                 continue;
             }
             final int alpha = (int) (30 + 90 * Math.min(1f, weight / maxWeight));
@@ -403,6 +427,7 @@ public final class MainKeyboardView extends KeyboardView implements DrawingProxy
             mKeyWeightRegionPaint.setColor(Color.argb(Math.min(255, alpha * 2), 255, 0, 128));
             canvas.drawPath(mKeyWeightRegionPath, mKeyWeightRegionPaint);
             if (mKeyDetector.getBaselineKeyRegion(key, mKeyWeightRegionPath)) {
+                mKeyWeightRegionPaint.setColor(BASELINE_REGION_COLOR);
                 mKeyWeightRegionPaint.setPathEffect(mBaselineDashEffect);
                 canvas.drawPath(mKeyWeightRegionPath, mKeyWeightRegionPaint);
                 mKeyWeightRegionPaint.setPathEffect(null);

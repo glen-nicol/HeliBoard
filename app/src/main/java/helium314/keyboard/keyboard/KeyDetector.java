@@ -339,6 +339,17 @@ public class KeyDetector {
         return getKeyWeight(key);
     }
 
+    /** Sets {@code out} to the full region outline of any key that has one, in view coordinates. */
+    public boolean getKeyRegionOutline(final Key key, final Path out) {
+        final Path path = mKeyPaths.get(key);
+        if (path == null) {
+            return false;
+        }
+        out.set(path);
+        out.offset(-mCorrectionX, -mCorrectionY);
+        return true;
+    }
+
     /** Sets {@code out} to the baseline-only outline of a predicted key in view coordinates, if there is one. */
     public boolean getBaselineKeyRegion(final Key key, final Path out) {
         final Path path = mKeyBaselinePaths.get(key);
